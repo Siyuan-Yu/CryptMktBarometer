@@ -12,7 +12,8 @@ from typing import Any
 
 from collectors.funding_collect import collect_funding
 from collectors.macro_collect import collect_macro
-from collectors.news_collect import collect_news, select_top_news
+from collectors.news_collect import collect_news
+from collectors.news_display import prepare_all_news_views
 from core.config_loader import load_config
 from core.state_store import increment_fetch_count, set_fetching, update_state
 from scoring.engine import compute_scores
@@ -68,7 +69,11 @@ def run_data_fetch() -> FetchResult:
 
         all_news, news_summary_lines, news_errors = collect_news(cfg)
         errors.extend(news_errors)
-        top_news = select_top_news(all_news, limit=10)
+        news_views = prepare_all_news_views(all_news, top_limit=10, category_limit=10)
+        top_news = news_views["top"]
+        sol_news = news_views["sol"]
+        eth_news = news_views["eth"]
+        macro_news = news_views["macro"]
 
         macro = collect_macro(cfg)
         errors.extend(macro.errors)
@@ -106,15 +111,20 @@ def run_data_fetch() -> FetchResult:
 
                     score_result.rating_label = rating_from_total_score(total_dyn)
                     score_result.categories = cats_dyn
-                influence = wo.get_module_influence(
-                    int(opt_cfg.get("window_long_days", 30))
-                )
+                inf7, inf30 = wo.get_dual_module_influence()
+                recalc_h = int(opt_cfg.get("recalc_interval_hours", 6))
+                next_at = (
+                    __import__("datetime").datetime.now()
+                    + __import__("datetime").timedelta(hours=recalc_h)
+                ).strftime("%Y-%m-%d %H:%M:%S")
                 wo._persist_optimizer_state(
                     {
                         "weights": weights,
-                        "influence": influence,
+                        "influence_7": inf7,
+                        "influence_30": inf30,
                         "price_sync": {},
-                        "impacts_updated": 0,
+                        "impacts_updated": wo.measure_pending_impacts(),
+                        "next_recalc_at": next_at,
                     }
                 )
             except Exception as exc:
@@ -162,6 +172,9 @@ def run_data_fetch() -> FetchResult:
             categories=score_result.categories,
             total_score=score_result.total_score,
             top_news=top_news,
+            sol_news=sol_news,
+            eth_news=eth_news,
+            macro_news=macro_news,
             fetch_log=fetch_log,
             last_fetch_time=finished_at,
             is_fetching=False,

@@ -13,6 +13,17 @@ from core.config_loader import PROJECT_ROOT, load_config
 FETCH_LOG_FILENAME = "fetch_history.csv"
 NEWS_LOG_FILENAME = "news_snapshot.csv"
 SCORE_LOG_FILENAME = "score_history.csv"
+WEIGHT_LOG_FILENAME = "weight_history.csv"
+_WEIGHT_COLUMNS = [
+    "update_time",
+    "method",
+    "macro",
+    "regulation",
+    "funding",
+    "fundamentals",
+    "next_recalc_at",
+    "impact_samples",
+]
 _FETCH_COLUMNS = ["fetch_time", "duration_sec", "success", "error_count", "summary"]
 _SCORE_COLUMNS = [
     "fetch_time",
@@ -134,6 +145,35 @@ def append_score_history(
                 "regulation": _pts("全球监管政策"),
                 "funding": _pts("资金链上数据"),
                 "fundamentals": _pts("ETH/SOL 币种基本面"),
+            }
+        )
+    return file_path
+
+
+def append_weight_history(
+    *,
+    weights: dict[str, int],
+    method: str,
+    next_recalc_at: str,
+    impact_samples: int = 0,
+) -> Path:
+    """每次动态权重更新写入日志（永久追加，不覆盖）。"""
+    file_path = _log_dir() / WEIGHT_LOG_FILENAME
+    write_header = not file_path.exists()
+    with open(file_path, "a", newline="", encoding="utf-8-sig") as f:
+        writer = csv.DictWriter(f, fieldnames=_WEIGHT_COLUMNS)
+        if write_header:
+            writer.writeheader()
+        writer.writerow(
+            {
+                "update_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "method": method,
+                "macro": weights.get("macro", ""),
+                "regulation": weights.get("regulation", ""),
+                "funding": weights.get("funding", ""),
+                "fundamentals": weights.get("fundamentals", ""),
+                "next_recalc_at": next_recalc_at,
+                "impact_samples": impact_samples,
             }
         )
     return file_path

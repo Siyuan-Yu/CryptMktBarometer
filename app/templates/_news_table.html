@@ -1,0 +1,24 @@
+{# 资讯表格片段：title_cn / summary_cn / keywords_cn #}
+{% macro news_rows(items) %}
+    {% if items %}
+        {% for item in items %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td class="title-cell">{{ item.title_cn or item.display_title or item.title }}</td>
+            <td class="summary-cell">{{ item.summary_cn or '—' }}</td>
+            <td class="keywords-cell">{{ (item.keywords_cn or item.display_keywords or item.keywords) | join(' · ') if (item.keywords_cn or item.keywords) else '—' }}</td>
+            <td class="impact-cell {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
+                {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}
+            </td>
+            <td>{{ item.source }}</td>
+            <td>
+                {% if item.url %}
+                <a href="{{ item.url }}" target="_blank" rel="noopener">查看</a>
+                {% else %}—{% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+    {% else %}
+        <tr><td colspan="7" class="empty-row">暂无该类资讯</td></tr>
+    {% endif %}
+{% endmacro %}

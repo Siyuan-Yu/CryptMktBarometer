@@ -72,6 +72,60 @@ body {
 .badge-on { background: rgba(16, 185, 129, 0.35); }
 .badge-off { background: rgba(255, 255, 255, 0.12); }
 
+/* 实时价格条 */
+.price-strip {
+    max-width: 1200px;
+    margin: 1rem auto 0;
+    padding: 0 1rem;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 0.75rem;
+    align-items: stretch;
+}
+
+.price-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.25rem;
+    box-shadow: var(--shadow);
+    text-align: center;
+}
+
+.price-label {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+}
+
+.price-value {
+    font-size: 1.65rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 0.35rem 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.price-change {
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.price-change.chg-up { color: var(--bull-strong); }
+.price-change.chg-down { color: var(--bear-strong); }
+
+.price-meta {
+    grid-column: 1 / -1;
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
 /* 主内容 */
 .main-content {
     max-width: 1200px;
@@ -101,6 +155,13 @@ body {
     font-size: 0.78rem;
     color: var(--text-muted);
     margin-top: 0.75rem;
+}
+
+.status-banner {
+    background: #eff6ff;
+    border-left: 3px solid var(--accent);
+    padding: 0.4rem 0.65rem;
+    border-radius: 4px;
 }
 
 /* 表格 */
@@ -179,6 +240,52 @@ body {
 
 .impact-pos { color: var(--bull-strong); font-weight: 600; }
 .impact-neg { color: var(--bear-strong); font-weight: 600; }
+.impact-neutral { color: var(--neutral); }
+
+.muted { color: var(--text-muted); font-size: 0.78rem; font-weight: 400; }
+
+.weight-bar-wrap {
+    background: #e2e8f0;
+    border-radius: 4px;
+    height: 8px;
+    margin-bottom: 0.25rem;
+    max-width: 140px;
+}
+.weight-bar {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    transition: width 0.6s ease;
+}
+.boost-tag {
+    font-size: 0.7rem;
+    background: #fef3c7;
+    color: #b45309;
+    padding: 0.1rem 0.35rem;
+    border-radius: 3px;
+    margin-left: 0.25rem;
+}
+
+.btn-primary {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 6px;
+    font-size: 0.875rem;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-primary:hover { background: #1d4ed8; }
+.btn-primary:disabled { opacity: 0.6; cursor: wait; }
+
+.backtest-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+}
 
 .empty-row {
     text-align: center;
@@ -224,13 +331,35 @@ a:hover { text-decoration: underline; }
     color: var(--bear-strong);
 }
 
-/* 页脚 */
+/* 页脚与使用说明 */
 .site-footer {
-    text-align: center;
-    padding: 1rem;
-    font-size: 0.75rem;
+    max-width: 1200px;
+    margin: 0 auto 2rem;
+    padding: 1.25rem 1rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     border-top: 1px solid var(--border);
+    background: var(--card);
+}
+
+.usage-guide { text-align: left; }
+
+.guide-title {
+    font-size: 0.95rem;
+    color: var(--text);
+    margin-bottom: 0.75rem;
+}
+
+.guide-list {
+    margin: 0 0 0.75rem 1.25rem;
+    line-height: 1.7;
+}
+
+.guide-list li { margin-bottom: 0.35rem; }
+
+.guide-note {
+    font-size: 0.75rem;
+    color: var(--text-muted);
 }
 
 /* 手机端适配（第六步局域网访问时有用） */
@@ -238,4 +367,6 @@ a:hover { text-decoration: underline; }
     .site-title { font-size: 1.1rem; }
     .panel { padding: 0.75rem; }
     .data-table { font-size: 0.8rem; }
+    .price-strip { grid-template-columns: 1fr; }
+    .price-value { font-size: 1.35rem; }
 }

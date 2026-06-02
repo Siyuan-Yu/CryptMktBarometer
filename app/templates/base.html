@@ -13,18 +13,19 @@
     <header class="site-header">
         <div class="header-inner">
             <h1 class="site-title">{{ page_title | default('加密货币行情晴雨分析系统') }}</h1>
-            <p class="site-subtitle">本地常驻 · 多源聚合 · 晴雨计分</p>
+            <p class="site-subtitle">本地常驻 · 多源聚合 · 晴雨计分 · 动态权重</p>
         </div>
         <div class="header-meta">
             <span class="meta-badge {% if scheduler_enabled %}badge-on{% else %}badge-off{% endif %}">
-                定时任务：{% if scheduler_enabled %}已启用{% else %}未启用（第二步）{% endif %}
+                定时任务：{% if scheduler_enabled %}已启用{% else %}未启用{% endif %}
             </span>
             <span class="meta-badge">拉取间隔：{{ poll_interval_label | default('10 分钟') }}</span>
-            {% if page_auto_refresh_seconds and page_auto_refresh_seconds > 0 %}
-            <span class="meta-badge">页面每 {{ page_auto_refresh_seconds }} 秒自动刷新</span>
-            {% endif %}
             <span class="meta-badge">已完成拉取：{{ fetch_count | default(0) }} 轮</span>
-            <span class="meta-badge">最近拉取：{{ last_fetch_time | default('—') }}{% if is_fetching %}（进行中…）{% endif %}</span>
+            <span class="meta-badge">最近拉取：<span id="live-last-fetch">{{ last_fetch_time | default('—') }}</span>{% if is_fetching %}（进行中…）{% endif %}</span>
+            <span class="meta-badge">权重更新：<span id="live-weights-updated">{{ weight_optimizer.weights_updated_at | default('—') }}</span></span>
+            <span class="meta-badge">下次权重更新：<span id="live-weight-countdown">—</span></span>
+            <span class="meta-badge">行情/资讯刷新：<span id="live-page-updated">—</span></span>
+            <span class="meta-badge">价格刷新：每 {{ price_refresh_seconds | default(5) }} 秒</span>
             <span class="meta-badge">访问：http://{{ web_host }}:{{ web_port }}</span>
         </div>
     </header>
@@ -33,8 +34,15 @@
         {% block content %}{% endblock %}
     </main>
 
-    <footer class="site-footer">
-        <p>动态权重+回测已启用 · 见板块 D/E/F · 回测说明 docs/WEIGHT_OPTIMIZER.md</p>
-    </footer>
+    {% block footer_extra %}{% endblock %}
+
+    <script>
+        window.DASHBOARD_CONFIG = {
+            refreshSeconds: {{ dashboard_refresh_seconds | default(30) }},
+            priceRefreshSeconds: {{ price_refresh_seconds | default(5) }},
+            backtestStart: "{{ backtest_default_start | default('2025-01-01') }}"
+        };
+    </script>
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

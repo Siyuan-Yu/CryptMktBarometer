@@ -1,6 +1,30 @@
 {% extends "base.html" %}
+{% from '_news_table.html' import news_rows %}
 
 {% block content %}
+<!-- 实时价格卡片 -->
+<section class="price-strip" id="price-strip">
+    <div class="price-card" id="price-btc">
+        <div class="price-label">BTC</div>
+        <div class="price-value" data-price-value>—</div>
+        <div class="price-change" data-price-change>24h —</div>
+    </div>
+    <div class="price-card" id="price-eth">
+        <div class="price-label">ETH</div>
+        <div class="price-value" data-price-value>—</div>
+        <div class="price-change" data-price-change>24h —</div>
+    </div>
+    <div class="price-card" id="price-sol">
+        <div class="price-label">SOL</div>
+        <div class="price-value" data-price-value>—</div>
+        <div class="price-change" data-price-change>24h —</div>
+    </div>
+    <div class="price-meta">
+        <span>数据源：<span id="price-source">—</span></span>
+        <span>更新：<span id="price-updated">—</span></span>
+    </div>
+</section>
+
 <!-- 板块 A：大盘晴雨计分总表 -->
 <section class="panel panel-a" id="panel-score">
     <h2 class="panel-title">板块 A · 大盘晴雨计分总表</h2>
@@ -14,7 +38,7 @@
                     <th>分项简要说明</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="score-tbody">
                 {% for cat in categories %}
                 <tr>
                     <td>{{ cat.name }}</td>
@@ -29,7 +53,7 @@
             <tfoot>
                 <tr class="total-row">
                     <td colspan="2"><strong>综合总分</strong></td>
-                    <td class="total-score-cell">
+                    <td class="total-score-cell" id="total-score">
                         {% if total_score is not none %}
                             <strong>{{ total_score | round(1) }}</strong> / 100
                         {% else %}
@@ -37,7 +61,7 @@
                         {% endif %}
                     </td>
                     <td>
-                        <span class="rating-tag {{ rating_class }}">当前市场评级：{{ rating_label }}</span>
+                        <span class="rating-tag {{ rating_class }}" id="rating-tag">当前市场评级：{{ rating_label }}</span>
                     </td>
                 </tr>
             </tfoot>
@@ -46,47 +70,73 @@
     <p class="panel-hint">评级规则：&gt;70 强利多 · 55~70 偏利多 · 45~55 中性 · 30~45 偏利空 · &lt;30 强利空</p>
 </section>
 
-<!-- 板块 B：TOP10 重磅资讯 -->
+<!-- 板块 B：TOP10 重磅资讯（中文） -->
 <section class="panel panel-b" id="panel-news">
-    <h2 class="panel-title">板块 B · TOP10 重磅资讯</h2>
+    <h2 class="panel-title">板块 B · TOP10 重磅资讯（中文摘要）</h2>
     <div class="table-wrap">
         <table class="data-table news-table">
             <thead>
                 <tr>
-                    <th>序号</th>
-                    <th>消息标题</th>
-                    <th>来源名称</th>
-                    <th>源链接</th>
-                    <th>影响分值</th>
-                    <th>核心关键词</th>
-                    <th>影响盘面逻辑说明</th>
+                    <th>#</th>
+                    <th>中文标题</th>
+                    <th>中文摘要</th>
+                    <th>关键词</th>
+                    <th>分值</th>
+                    <th>来源</th>
+                    <th>链接</th>
                 </tr>
             </thead>
-            <tbody>
-                {% if top_news %}
-                    {% for item in top_news %}
-                    <tr>
-                        <td>{{ loop.index }}</td>
-                        <td class="title-cell">{{ item.title }}</td>
-                        <td>{{ item.source }}</td>
-                        <td>
-                            {% if item.url %}
-                            <a href="{{ item.url }}" target="_blank" rel="noopener">查看</a>
-                            {% else %}—{% endif %}
-                        </td>
-                        <td class="impact-cell {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
-                            {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}
-                        </td>
-                        <td class="keywords-cell">{{ item.keywords | join(' · ') if item.keywords else '—' }}</td>
-                        <td class="logic-cell">{{ item.logic or '—' }}</td>
-                    </tr>
-                    {% endfor %}
-                {% else %}
-                    <tr>
-                        <td colspan="7" class="empty-row">暂无资讯数据；定时任务每轮拉取后，第三步对接数据源并按影响分值排序 TOP10</td>
-                    </tr>
-                {% endif %}
+            <tbody id="news-tbody">
+                {{ news_rows(top_news) }}
             </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 板块 G：SOL 专属 -->
+<section class="panel panel-g" id="panel-sol">
+    <h2 class="panel-title">板块 G · SOL 专属 TOP 资讯</h2>
+    <p class="panel-hint">仅显示与 Solana / SOL 生态强相关的消息，不含混杂宏观或纯 BTC 内容。</p>
+    <div class="table-wrap">
+        <table class="data-table news-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
+                </tr>
+            </thead>
+            <tbody id="sol-news-tbody">{{ news_rows(sol_news) }}</tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 板块 H：ETH 专属 -->
+<section class="panel panel-h" id="panel-eth">
+    <h2 class="panel-title">板块 H · ETH 专属 TOP 资讯</h2>
+    <p class="panel-hint">仅显示与以太坊 / ETH / L2 生态强相关的消息。</p>
+    <div class="table-wrap">
+        <table class="data-table news-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
+                </tr>
+            </thead>
+            <tbody id="eth-news-tbody">{{ news_rows(eth_news) }}</tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 板块 I：美股/宏观 -->
+<section class="panel panel-i" id="panel-macro-news">
+    <h2 class="panel-title">板块 I · 美股 / 宏观 TOP 资讯</h2>
+    <p class="panel-hint">CPI、美联储、利率、美股指数、国债收益率等宏观驱动消息。</p>
+    <div class="table-wrap">
+        <table class="data-table news-table">
+            <thead>
+                <tr>
+                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
+                </tr>
+            </thead>
+            <tbody id="macro-news-tbody">{{ news_rows(macro_news) }}</tbody>
         </table>
     </div>
 </section>
@@ -97,11 +147,7 @@
     <div class="log-box">
         <dl class="log-dl">
             <dt>本轮抓取时间</dt>
-            <dd>{{ fetch_log.fetch_time }}</dd>
-            {% if fetch_log.started_at %}
-            <dt>开始时间</dt>
-            <dd>{{ fetch_log.started_at }}</dd>
-            {% endif %}
+            <dd id="log-fetch-time">{{ fetch_log.fetch_time }}</dd>
             {% if fetch_log.duration_sec is defined %}
             <dt>耗时（秒）</dt>
             <dd>{{ fetch_log.duration_sec }}</dd>
@@ -111,16 +157,6 @@
             {% if fetch_log.total_score is defined and fetch_log.total_score is not none %}
             <dt>本轮综合计分</dt>
             <dd><strong>{{ fetch_log.total_score }}</strong> / 100 · {{ fetch_log.rating_label }}</dd>
-            {% endif %}
-            {% if fetch_log.macro_calendar %}
-            <dt>近期经济发布（FRED）</dt>
-            <dd>
-                <ul class="error-list" style="color: #5c6b7f;">
-                    {% for item in fetch_log.macro_calendar %}
-                    <li>{{ item }}</li>
-                    {% endfor %}
-                </ul>
-            </dd>
             {% endif %}
             <dt>异常报错</dt>
             <dd>
@@ -138,26 +174,35 @@
     </div>
 </section>
 
-<!-- 板块 D：当前动态权重 -->
+<!-- 板块 D ~ F（动态权重 / 冲击 / 回测）保持原样 -->
 <section class="panel panel-d" id="panel-weights">
     <h2 class="panel-title">板块 D · 当前动态权重</h2>
-    <p class="panel-hint">根据近 7/30 天消息实际价格冲击自动调节（总和恒为 100）</p>
+    <p class="panel-hint status-banner" id="weight-status">{{ weight_optimizer.status_message or '动态权重每 6 小时平滑更新；突发事件 24h 内 +20%' }}</p>
+    <p class="panel-hint">
+        模式：{{ weight_optimizer.weights_method or '—' }}
+        · 下次计划：{{ weight_optimizer.next_recalc_at or '—' }}
+    </p>
     <div class="table-wrap">
         <table class="data-table">
             <thead>
                 <tr>
                     <th>模块</th>
-                    <th>动态权重</th>
-                    <th>原固定权重</th>
+                    <th>当前权重</th>
+                    <th>基准 30/30/35/5</th>
+                    <th>旧版</th>
                     <th>变化</th>
                 </tr>
             </thead>
-            <tbody>
+            <tbody id="weights-tbody">
                 {% if weight_optimizer.dynamic_weights %}
                     {% for row in weight_optimizer.dynamic_weights %}
                     <tr>
-                        <td>{{ row.name }}</td>
-                        <td><strong>{{ row.weight }}%</strong></td>
+                        <td>{{ row.name }}{% if row.event_boost %} <span class="boost-tag">突发+20%</span>{% endif %}</td>
+                        <td>
+                            <div class="weight-bar-wrap"><div class="weight-bar" style="width: {{ row.bar_percent or row.weight }}%"></div></div>
+                            <strong>{{ row.weight }}%</strong>
+                        </td>
+                        <td>{{ row.baseline_weight }}%</td>
                         <td>{{ row.static_weight }}%</td>
                         <td class="{% if row.delta > 0 %}impact-pos{% elif row.delta < 0 %}impact-neg{% endif %}">
                             {% if row.delta > 0 %}+{% endif %}{{ row.delta }}
@@ -165,76 +210,76 @@
                     </tr>
                     {% endfor %}
                 {% else %}
-                    <tr><td colspan="4" class="empty-row">等待首轮权重计算（每 6 小时或每次拉取后更新）</td></tr>
+                    <tr><td colspan="5" class="empty-row">等待权重计算</td></tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
-    {% if weight_optimizer.weights_method %}
-    <p class="panel-hint">模式：{{ weight_optimizer.weights_method }} · 更新：{{ weight_optimizer.weights_updated_at or '—' }}</p>
-    {% endif %}
 </section>
 
-<!-- 板块 E：模块市场影响力 -->
 <section class="panel panel-e" id="panel-influence">
-    <h2 class="panel-title">板块 E · 各模块实际市场影响力（近 {{ weight_optimizer.influence_window_days or 30 }} 天）</h2>
+    <h2 class="panel-title">板块 E · 各模块真实市场冲击（24h 价格）</h2>
+    <p class="panel-hint">
+        <span class="impact-pos">绿=利多</span> · <span class="impact-neg">红=利空</span>
+        · 样本 {{ weight_optimizer.impact_samples or 0 }}/{{ weight_optimizer.impact_total or 0 }}
+    </p>
     <div class="table-wrap">
         <table class="data-table">
             <thead>
-                <tr>
-                    <th>模块</th>
-                    <th>影响力分数</th>
-                    <th>样本条数</th>
-                </tr>
+                <tr><th>模块</th><th>7天冲击</th><th>7天样本</th><th>30天冲击</th><th>30天样本</th></tr>
             </thead>
-            <tbody>
+            <tbody id="influence-tbody">
                 {% if weight_optimizer.module_influence %}
                     {% for row in weight_optimizer.module_influence %}
                     <tr>
                         <td>{{ row.name }}</td>
-                        <td>{{ row.influence }}</td>
+                        <td class="{{ row.color_7 or 'impact-neutral' }}">{% if row.signed_7 and row.signed_7 > 0 %}+{% endif %}{{ row.signed_7 | default(0) }}</td>
+                        <td>{{ row.samples_7 }}</td>
+                        <td class="{{ row.color_class or 'impact-neutral' }}">{% if row.signed and row.signed > 0 %}+{% endif %}{{ row.signed | default(0) }}</td>
                         <td>{{ row.samples }}</td>
                     </tr>
                     {% endfor %}
                 {% else %}
-                    <tr><td colspan="3" class="empty-row">需积累 TOP10 资讯满 24h 后自动测算实际冲击</td></tr>
+                    <tr><td colspan="5" class="empty-row">等待冲击样本</td></tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
 </section>
 
-<!-- 板块 F：历史回测摘要 -->
 <section class="panel panel-f" id="panel-backtest">
-    <h2 class="panel-title">板块 F · 历史回测结果摘要</h2>
-    {% set bt = weight_optimizer.backtest or {} %}
-    {% if bt %}
-    <div class="log-box">
-        <dl class="log-dl">
-            <dt>回测区间</dt>
-            <dd>{{ bt.start_date }} ~ {{ bt.end_date }}（{{ bt.sample_days }} 个有效日）</dd>
-            <dt>方向准确率</dt>
-            <dd>固定权重 {{ bt.fixed_accuracy }} · 动态权重 {{ bt.dynamic_accuracy }}</dd>
-            <dt>相关性</dt>
-            <dd>固定 {{ bt.fixed_correlation }} · 动态 {{ bt.dynamic_correlation }}</dd>
-            <dt>回测最优权重</dt>
-            <dd>
-                宏观 {{ bt.optimal_weights.macro }} ·
-                监管 {{ bt.optimal_weights.regulation }} ·
-                资金 {{ bt.optimal_weights.funding }} ·
-                币种 {{ bt.optimal_weights.fundamentals }}
-            </dd>
-            <dt>说明</dt>
-            <dd>{{ bt.message }}</dd>
-            {% if bt.csv_path %}
-            <dt>CSV</dt>
-            <dd><code>{{ bt.csv_path }}</code></dd>
-            {% endif %}
-        </dl>
+    <h2 class="panel-title">板块 F · 历史回测结果</h2>
+    <div class="backtest-actions">
+        <button type="button" class="btn-primary" id="btn-backtest">一键回测（2025-01-01 至今）</button>
+        <span class="panel-hint" id="backtest-run-status"></span>
     </div>
-    {% else %}
-    <p class="panel-hint">尚未运行回测。命令行执行：<code>python weight_optimizer.py --backtest 2024-01-01 2025-05-31</code>
-        或浏览器访问 <code>/api/backtest?start=2024-01-01&amp;end=2025-05-31</code></p>
-    {% endif %}
+    <div class="log-box" id="backtest-box">
+        {% set bt = weight_optimizer.backtest or {} %}
+        {% if bt and bt.start_date %}
+        <dl class="log-dl">
+            <dt>回测区间</dt><dd>{{ bt.start_date }} ~ {{ bt.end_date }}（{{ bt.sample_days }} 日）</dd>
+            <dt>方向准确率</dt><dd>固定 {{ bt.fixed_accuracy }} · 动态 <strong class="impact-pos">{{ bt.dynamic_accuracy }}</strong></dd>
+            <dt>BTC 相关性</dt><dd>{{ bt.fixed_correlation }} / {{ bt.dynamic_correlation }}</dd>
+            <dt>最优权重</dt><dd>宏观{{ bt.optimal_weights.macro }} 监管{{ bt.optimal_weights.regulation }} 资金{{ bt.optimal_weights.funding }} 币{{ bt.optimal_weights.fundamentals }}</dd>
+        </dl>
+        {% else %}
+        <p class="panel-hint">点击按钮运行回测，结果保存至 data/logs/</p>
+        {% endif %}
+    </div>
 </section>
+{% endblock %}
+
+{% block footer_extra %}
+<footer class="site-footer usage-guide">
+    <h3 class="guide-title">极简使用说明</h3>
+    <ol class="guide-list">
+        <li><strong>启动</strong>：<code>venv\Scripts\activate</code> → <code>python main.py</code></li>
+        <li><strong>停止</strong>：终端 <code>Ctrl+C</code></li>
+        <li><strong>看页面</strong>：<code>http://127.0.0.1:5000</code></li>
+        <li><strong>手机访问</strong>：<code>web.host: 0.0.0.0</code> 后使用局域网 IP</li>
+        <li><strong>回测</strong>：板块 F 一键回测按钮</li>
+        <li><strong>自动刷新</strong>：价格每 <strong>{{ price_refresh_seconds | default(5) }}</strong> 秒 · 行情/资讯/评分每 <strong>{{ dashboard_refresh_seconds | default(30) }}</strong> 秒 · 后台抓取仍每 10 分钟</li>
+        <li><strong>权重更新</strong>：每 {{ recalc_interval_hours | default(6) }} 小时自动重算</li>
+    </ol>
+</footer>
 {% endblock %}

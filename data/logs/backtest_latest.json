@@ -1,0 +1,17 @@
+{
+  "start_date": "2025-01-01",
+  "end_date": "2026-06-02",
+  "sample_days": 446,
+  "fixed_accuracy": "93.3%",
+  "dynamic_accuracy": "93.3%",
+  "fixed_correlation": 0.933,
+  "dynamic_correlation": 0.903,
+  "optimal_weights": {
+    "macro": 30,
+    "regulation": 20,
+    "funding": 35,
+    "fundamentals": 15
+  },
+  "message": "资讯冲击回测：447 条新闻，446 个有效日。旧版权重40/20/25/15 准确率 93.3%，动态权重 93.3%（提升 +0.0%）；相关性提升 -0.030。",
+  "csv_path": "F:\\CryptMktBarometer\\CryptMktBarometer\\data\\logs\\backtest_summary.csv"
+}

@@ -8,7 +8,10 @@ web:
   host: "127.0.0.1"          # 本机访问；第六步可改为 0.0.0.0 以支持局域网
   port: 5000
   debug: false
-  page_auto_refresh_seconds: 0  # 页面自动刷新（秒），测试可设 5
+  page_auto_refresh_seconds: 0
+  price_refresh_seconds: 5
+  price_cache_seconds: 4
+  dashboard_refresh_seconds: 30
 
 # 定时轮询（第二步启用）
 scheduler:

@@ -118,3 +118,53 @@ def count_candles(symbol: str) -> int:
 
 def symbol_to_pair(symbol: str) -> str:
     return _SYMBOL_MAP.get(symbol.upper(), f"{symbol.upper()}USDT")
+
+
+def daily_close_series(
+    symbol: str,
+    start_date: str,
+    end_date: str,
+) -> dict[str, float]:
+    """
+    按 UTC 日聚合小时 K 线，取每日最后一根收盘价。
+    返回 {YYYY-MM-DD: close}
+    """
+    init_schema()
+    sym = symbol.upper()
+    start_dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+    end_dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
+    start_ms = int(start_dt.timestamp() * 1000)
+    end_ms = int(end_dt.timestamp() * 1000)
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT ts, close FROM prices_hourly
+            WHERE symbol=? AND ts>=? AND ts<?
+            ORDER BY ts ASC
+            """,
+            (sym, start_ms, end_ms),
+        ).fetchall()
+
+    daily: dict[str, float] = {}
+    for row in rows:
+        day = datetime.fromtimestamp(row["ts"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d")
+        daily[day] = float(row["close"])
+    return daily
+
+
+def daily_return_series(
+    symbol: str,
+    start_date: str,
+    end_date: str,
+) -> dict[str, float]:
+    """日收益率（%），键为日期。"""
+    closes = daily_close_series(symbol, start_date, end_date)
+    days = sorted(closes.keys())
+    out: dict[str, float] = {}
+    for i in range(1, len(days)):
+        d = days[i]
+        prev = closes[days[i - 1]]
+        if prev:
+            out[d] = (closes[d] - prev) / prev * 100.0
+    return out

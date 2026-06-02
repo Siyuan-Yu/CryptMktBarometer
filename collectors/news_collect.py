@@ -15,10 +15,16 @@ from collectors.types import NewsItem
 logger = logging.getLogger(__name__)
 
 
-def select_top_news(items: list[NewsItem], limit: int = 10) -> list[dict[str, Any]]:
+def select_top_news(
+    items: list[NewsItem],
+    limit: int = 10,
+    *,
+    to_display=None,
+) -> list[dict[str, Any]]:
     """按影响分值绝对值降序，取前 N 条。"""
+    convert = to_display or (lambda n: n.to_display_dict())
     sorted_items = sorted(items, key=lambda x: abs(x.impact_score), reverse=True)
-    return [n.to_display_dict() for n in sorted_items[:limit]]
+    return [convert(n) for n in sorted_items[:limit]]
 
 
 def collect_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -55,6 +55,15 @@ def init_schema() -> None:
         )
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_impact_mod ON news_impacts(module)"
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS weight_state (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                macro INTEGER, regulation INTEGER, funding INTEGER, fundamentals INTEGER,
+                method TEXT, updated_at TEXT, next_recalc_at TEXT
+            )
+            """
         )
         conn.commit()
 
@@ -175,6 +184,74 @@ def module_influence_stats(days: int) -> dict[str, dict[str, float]]:
                 "event_ratio": sum(int(r["is_event"]) for r in rows) / len(rows),
             }
     return out
+
+
+def count_measured_impacts() -> int:
+    init_schema()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS c FROM news_impacts WHERE composite_24h IS NOT NULL"
+        ).fetchone()
+    return int(row["c"])
+
+
+def count_total_impacts() -> int:
+    init_schema()
+    with get_connection() as conn:
+        row = conn.execute("SELECT COUNT(*) AS c FROM news_impacts").fetchone()
+    return int(row["c"])
+
+
+def save_weight_state(
+    macro: int,
+    regulation: int,
+    funding: int,
+    fundamentals: int,
+    *,
+    method: str,
+    next_recalc_at: str,
+) -> None:
+    init_schema()
+    now = datetime.now().isoformat()
+    with get_connection() as conn:
+        conn.execute("DELETE FROM weight_state WHERE id=1")
+        conn.execute(
+            """
+            INSERT INTO weight_state(id, macro, regulation, funding, fundamentals, method, updated_at, next_recalc_at)
+            VALUES (1,?,?,?,?,?,?,?)
+            """,
+            (macro, regulation, funding, fundamentals, method, now, next_recalc_at),
+        )
+        conn.commit()
+
+
+def load_weight_state() -> dict[str, Any] | None:
+    init_schema()
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM weight_state WHERE id=1").fetchone()
+    return dict(row) if row else None
+
+
+def has_recent_event(module: str, hours: int = 24) -> bool:
+    """该模块在 past N 小时内是否有突发事件标记（CPI/美联储/ETF/SEC/爆仓等）。"""
+    init_schema()
+    since = (datetime.now() - timedelta(hours=hours)).isoformat()
+    with get_connection() as conn:
+        row = conn.execute(
+            """
+            SELECT 1 FROM news_impacts
+            WHERE module=? AND is_event=1 AND published_at>=?
+            LIMIT 1
+            """,
+            (module, since),
+        ).fetchone()
+    return row is not None
+
+
+def module_idle_days(module: str, days: int = 30, threshold: float = 0.2) -> bool:
+    """最近 N 天几乎无有效冲击。"""
+    stats = module_influence_stats(days).get(module, {})
+    return float(stats.get("count", 0)) < 1 or float(stats.get("abs_avg", 0)) < threshold
 
 
 def recent_weak_streak(module: str, threshold: float = 0.3, streak: int = 3) -> bool:

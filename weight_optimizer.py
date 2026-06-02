@@ -26,6 +26,10 @@ from core.config_loader import PROJECT_ROOT, load_config
 from core.market_rating import rating_from_total_score
 from scoring.constants import (
     FUNDAMENTALS_KEYWORDS,
+    LEGACY_WEIGHT_FUNDAMENTALS,
+    LEGACY_WEIGHT_FUNDING,
+    LEGACY_WEIGHT_MACRO,
+    LEGACY_WEIGHT_REGULATION,
     REGULATION_KEYWORDS,
     WEIGHT_FUNDAMENTALS,
     WEIGHT_FUNDING,
@@ -45,12 +49,23 @@ MODULE_FUNDAMENTALS = "fundamentals"
 
 MODULE_ORDER = (MODULE_MACRO, MODULE_REGULATION, MODULE_FUNDING, MODULE_FUNDAMENTALS)
 
+# 回测最优基准权重（当前默认）
 STATIC_WEIGHTS: dict[str, int] = {
     MODULE_MACRO: WEIGHT_MACRO,
     MODULE_REGULATION: WEIGHT_REGULATION,
     MODULE_FUNDING: WEIGHT_FUNDING,
     MODULE_FUNDAMENTALS: WEIGHT_FUNDAMENTALS,
 }
+
+# 旧版权重（回测对比）
+LEGACY_WEIGHTS: dict[str, int] = {
+    MODULE_MACRO: LEGACY_WEIGHT_MACRO,
+    MODULE_REGULATION: LEGACY_WEIGHT_REGULATION,
+    MODULE_FUNDING: LEGACY_WEIGHT_FUNDING,
+    MODULE_FUNDAMENTALS: LEGACY_WEIGHT_FUNDAMENTALS,
+}
+
+SMOOTH_ALPHA = 0.28
 
 WEIGHT_BOUNDS: dict[str, tuple[int, int]] = {
     MODULE_MACRO: (20, 50),
@@ -88,14 +103,18 @@ EVENT_KEYWORDS: dict[str, tuple[str, ...]] = {
 SPIKE_THRESHOLD = 2.5
 WEAK_THRESHOLD = 0.35
 WEAK_STREAK = 3
+EVENT_BOOST_FACTOR = 1.20
+EVENT_BOOST_HOURS = 24
+IDLE_DECAY_FACTOR = 0.94
+WEAK_STREAK_DECAY = 0.90
 
 
 @dataclass
 class DynamicWeights:
-    macro: int = 40
-    regulation: int = 20
-    funding: int = 25
-    fundamentals: int = 15
+    macro: int = WEIGHT_MACRO
+    regulation: int = WEIGHT_REGULATION
+    funding: int = WEIGHT_FUNDING
+    fundamentals: int = WEIGHT_FUNDAMENTALS
     method: str = "static"
     updated_at: str = ""
 
@@ -108,23 +127,33 @@ class DynamicWeights:
         }
 
     def as_list_for_ui(self) -> list[dict[str, Any]]:
+        from storage import impact_db
+
         labels = {
             MODULE_MACRO: "宏观数据",
             MODULE_REGULATION: "全球监管政策",
             MODULE_FUNDING: "资金链上数据",
             MODULE_FUNDAMENTALS: "ETH/SOL 币种基本面",
         }
-        static = STATIC_WEIGHTS
-        return [
-            {
-                "name": labels[k],
-                "module": k,
-                "weight": self.as_dict()[k],
-                "static_weight": static[k],
-                "delta": self.as_dict()[k] - static[k],
-            }
-            for k in MODULE_ORDER
-        ]
+        baseline = STATIC_WEIGHTS
+        legacy = LEGACY_WEIGHTS
+        rows = []
+        for k in MODULE_ORDER:
+            w = self.as_dict()[k]
+            boosted = impact_db.has_recent_event(k, EVENT_BOOST_HOURS)
+            rows.append(
+                {
+                    "name": labels[k],
+                    "module": k,
+                    "weight": w,
+                    "bar_percent": w,
+                    "baseline_weight": baseline[k],
+                    "static_weight": legacy[k],
+                    "delta": w - baseline[k],
+                    "event_boost": boosted,
+                }
+            )
+        return rows
 
 
 @dataclass
@@ -133,23 +162,38 @@ class ModuleInfluence:
 
     window_days: int
     scores: dict[str, float] = field(default_factory=dict)
+    signed_scores: dict[str, float] = field(default_factory=dict)
     sample_counts: dict[str, int] = field(default_factory=dict)
 
-    def as_ui_rows(self) -> list[dict[str, Any]]:
+    def as_ui_rows(self, signed: dict[str, float] | None = None) -> list[dict[str, Any]]:
         labels = {
             MODULE_MACRO: "宏观数据",
             MODULE_REGULATION: "全球监管政策",
             MODULE_FUNDING: "资金链上数据",
             MODULE_FUNDAMENTALS: "ETH/SOL 币种基本面",
         }
-        return [
-            {
-                "name": labels[k],
-                "influence": round(self.scores.get(k, 0.0), 2),
-                "samples": self.sample_counts.get(k, 0),
-            }
-            for k in MODULE_ORDER
-        ]
+        signed = signed or {}
+        rows = []
+        for k in MODULE_ORDER:
+            s = float(signed.get(k, 0))
+            rows.append(
+                {
+                    "name": labels[k],
+                    "influence": round(self.scores.get(k, 0.0), 2),
+                    "signed": round(s, 2),
+                    "samples": self.sample_counts.get(k, 0),
+                    "color_class": _impact_color_class(s),
+                }
+            )
+        return rows
+
+
+def _impact_color_class(signed: float) -> str:
+    if signed > 0.15:
+        return "impact-pos"
+    if signed < -0.15:
+        return "impact-neg"
+    return "impact-neutral"
 
 
 @dataclass
@@ -204,6 +248,25 @@ def is_breaking_event(title: str, module: str) -> bool:
 # ---------------------------------------------------------------------------
 # 价格冲击测算
 # ---------------------------------------------------------------------------
+def _parse_datetime(value: str) -> datetime | None:
+    value = (value or "").strip()
+    if not value:
+        return None
+    try:
+        pub = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if pub.tzinfo is None:
+            pub = pub.replace(tzinfo=timezone.utc)
+        return pub
+    except ValueError:
+        pass
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(value, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
 def measure_pending_impacts() -> int:
     """补全已发布满 24h 的消息的实际冲击值。"""
     from storage import impact_db, price_db
@@ -213,11 +276,8 @@ def measure_pending_impacts() -> int:
 
     updated = 0
     for row in impact_db.list_pending_measurement():
-        try:
-            pub = datetime.fromisoformat(row["published_at"])
-            if pub.tzinfo is None:
-                pub = pub.replace(tzinfo=timezone.utc)
-        except ValueError:
+        pub = _parse_datetime(row["published_at"])
+        if pub is None:
             continue
         now = datetime.now(timezone.utc)
         if now < pub + timedelta(hours=24):
@@ -289,46 +349,113 @@ def _influence_to_raw_weights(influence_7: dict, influence_30: dict) -> dict[str
     return raw
 
 
-def _apply_rules(weights: dict[str, float]) -> dict[str, float]:
+def _apply_event_boost_24h(weights: dict[str, float]) -> dict[str, float]:
+    """突发事件：24 小时内相关模块临时 +20%，过期自动恢复（依赖库内 is_event 标记）。"""
     from storage import impact_db
 
     for mod in MODULE_ORDER:
-        if impact_db.recent_weak_streak(mod, WEAK_THRESHOLD, WEAK_STREAK):
-            weights[mod] *= 0.75
-        stats = impact_db.module_influence_stats(7).get(mod, {})
-        if float(stats.get("abs_avg", 0)) >= SPIKE_THRESHOLD:
-            weights[mod] *= 1.35
-        if float(stats.get("event_ratio", 0)) >= 0.25:
-            weights[mod] *= 1.2
+        if impact_db.has_recent_event(mod, EVENT_BOOST_HOURS):
+            weights[mod] *= EVENT_BOOST_FACTOR
     return weights
 
 
+def _apply_rules(weights: dict[str, float], inf7: dict, inf30: dict) -> dict[str, float]:
+    from storage import impact_db
+
+    for mod in MODULE_ORDER:
+        s7 = inf7.get(mod, {})
+        s30 = inf30.get(mod, {})
+        a7 = float(s7.get("abs_avg", 0))
+        a30 = float(s30.get("abs_avg", 0))
+
+        if a30 >= 1.2:
+            weights[mod] *= 1.0 + min(0.18, a30 / 14.0)
+        if impact_db.module_idle_days(mod, 30, threshold=0.15):
+            weights[mod] *= IDLE_DECAY_FACTOR
+        if impact_db.recent_weak_streak(mod, WEAK_THRESHOLD, WEAK_STREAK):
+            weights[mod] *= WEAK_STREAK_DECAY
+        if a7 >= SPIKE_THRESHOLD:
+            weights[mod] *= 1.15
+        if float(s7.get("event_ratio", 0)) >= 0.2:
+            weights[mod] *= 1.10
+    return weights
+
+
+def _smooth_with_previous(new_w: DynamicWeights, prev: DynamicWeights | None, alpha: float) -> DynamicWeights:
+    if prev is None:
+        return new_w
+    blended = {
+        mod: prev.as_dict()[mod] * (1 - alpha) + new_w.as_dict()[mod] * alpha for mod in MODULE_ORDER
+    }
+    bounded = _normalize_weights(blended)
+    bounded.method = new_w.method + "+smooth"
+    bounded.updated_at = new_w.updated_at
+    return bounded
+
+
+def _load_previous_weights() -> DynamicWeights | None:
+    from storage import impact_db
+
+    row = impact_db.load_weight_state()
+    if not row:
+        return None
+    return DynamicWeights(
+        macro=int(row["macro"]),
+        regulation=int(row["regulation"]),
+        funding=int(row["funding"]),
+        fundamentals=int(row["fundamentals"]),
+        method=str(row.get("method") or ""),
+        updated_at=str(row.get("updated_at") or ""),
+    )
+
+
 def _normalize_weights(raw: dict[str, float]) -> DynamicWeights:
+    """在模块上下限内归一化，保证总和恒为 100，避免单点跳变。"""
     bounded: dict[str, float] = {}
     for mod in MODULE_ORDER:
         lo, hi = WEIGHT_BOUNDS[mod]
         bounded[mod] = clamp(raw.get(mod, 1.0), lo, hi)
 
-    total = sum(bounded.values())
-    scaled = {m: bounded[m] / total * 100.0 for m in MODULE_ORDER}
+    for _ in range(64):
+        total = sum(bounded.values())
+        if total <= 0:
+            return _static_weights()
+        if abs(total - 100.0) < 0.01:
+            break
+        for mod in MODULE_ORDER:
+            lo, hi = WEIGHT_BOUNDS[mod]
+            bounded[mod] = clamp(bounded[mod] * 100.0 / total, lo, hi)
 
-    final: dict[str, int] = {}
+    scaled = {m: bounded[m] / sum(bounded.values()) * 100.0 for m in MODULE_ORDER}
     ints = {m: int(round(scaled[m])) for m in MODULE_ORDER}
-    diff = 100 - sum(ints.values())
-    ints[MODULE_MACRO] += diff
-
     for mod in MODULE_ORDER:
         lo, hi = WEIGHT_BOUNDS[mod]
-        final[mod] = clamp(ints[mod], lo, hi)
+        ints[mod] = int(clamp(ints[mod], lo, hi))
 
-    diff2 = 100 - sum(final.values())
-    final[MODULE_MACRO] = clamp(final[MODULE_MACRO] + diff2, *WEIGHT_BOUNDS[MODULE_MACRO])
+    guard = 0
+    while sum(ints.values()) != 100 and guard < 200:
+        guard += 1
+        diff = 100 - sum(ints.values())
+        adjusted = False
+        order = MODULE_ORDER if diff > 0 else list(reversed(MODULE_ORDER))
+        for mod in order:
+            lo, hi = WEIGHT_BOUNDS[mod]
+            if diff > 0 and ints[mod] < hi:
+                ints[mod] += 1
+                adjusted = True
+                break
+            if diff < 0 and ints[mod] > lo:
+                ints[mod] -= 1
+                adjusted = True
+                break
+        if not adjusted:
+            break
 
     return DynamicWeights(
-        macro=final[MODULE_MACRO],
-        regulation=final[MODULE_REGULATION],
-        funding=final[MODULE_FUNDING],
-        fundamentals=final[MODULE_FUNDAMENTALS],
+        macro=ints[MODULE_MACRO],
+        regulation=ints[MODULE_REGULATION],
+        funding=ints[MODULE_FUNDING],
+        fundamentals=ints[MODULE_FUNDAMENTALS],
         method="dynamic",
         updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
     )
@@ -359,8 +486,23 @@ def compute_dynamic_weights(cfg: dict | None = None) -> DynamicWeights:
         return w
 
     raw = _influence_to_raw_weights(inf7, inf30)
-    raw = _apply_rules(raw)
-    return _normalize_weights(raw)
+    raw = _apply_rules(raw, inf7, inf30)
+    raw = _apply_event_boost_24h(raw)
+    new_w = _normalize_weights(raw)
+    alpha = float(opt.get("smooth_alpha", SMOOTH_ALPHA))
+    prev = _load_previous_weights()
+    return _smooth_with_previous(new_w, prev, alpha)
+
+
+def _legacy_weights() -> DynamicWeights:
+    return DynamicWeights(
+        macro=LEGACY_WEIGHTS[MODULE_MACRO],
+        regulation=LEGACY_WEIGHTS[MODULE_REGULATION],
+        funding=LEGACY_WEIGHTS[MODULE_FUNDING],
+        fundamentals=LEGACY_WEIGHTS[MODULE_FUNDAMENTALS],
+        method="legacy_40_20_25_15",
+        updated_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    )
 
 
 def _static_weights() -> DynamicWeights:
@@ -379,8 +521,18 @@ def get_module_influence(window_days: int = 30) -> ModuleInfluence:
 
     stats = impact_db.module_influence_stats(window_days)
     scores = {m: float(stats.get(m, {}).get("abs_avg", 0)) for m in MODULE_ORDER}
+    signed = {m: float(stats.get(m, {}).get("signed_avg", 0)) for m in MODULE_ORDER}
     counts = {m: int(stats.get(m, {}).get("count", 0)) for m in MODULE_ORDER}
-    return ModuleInfluence(window_days=window_days, scores=scores, sample_counts=counts)
+    return ModuleInfluence(
+        window_days=window_days,
+        scores=scores,
+        signed_scores=signed,
+        sample_counts=counts,
+    )
+
+
+def get_dual_module_influence() -> tuple[ModuleInfluence, ModuleInfluence]:
+    return get_module_influence(7), get_module_influence(30)
 
 
 # ---------------------------------------------------------------------------
@@ -483,18 +635,45 @@ def _grid_search_weights(daily_module: dict[str, dict[str, float]], btc_returns:
     return best
 
 
-def run_backtest(start_date: str, end_date: str, cfg: dict | None = None) -> BacktestResult:
+def _build_daily_module_from_prices(start_date: str, end_date: str) -> tuple[dict[str, dict[str, float]], dict[str, float]]:
     """
-    历史回测：对比固定权重 vs 动态权重。
-    需先回填价格：python weight_optimizer.py --backfill 2024-01-01 2025-05-31
+    用 BTC/ETH/SOL 日涨跌构造四大模块「代理冲击」（资讯样本不足时的价格回测）。
     """
+    from storage import price_db
+
+    btc = price_db.daily_return_series("BTC", start_date, end_date)
+    eth = price_db.daily_return_series("ETH", start_date, end_date)
+    sol = price_db.daily_return_series("SOL", start_date, end_date)
+    days = sorted(btc.keys())
+
+    daily_module: dict[str, dict[str, float]] = {}
+    btc_returns: dict[str, float] = {}
+
+    for i, d in enumerate(days):
+        b = btc[d]
+        e = eth.get(d, b)
+        s = sol.get(d, b)
+        btc_returns[d] = b
+
+        mom7 = sum(btc.get(days[j], 0) for j in range(max(0, i - 6), i + 1)) / min(7, i + 1)
+        vol7 = sum(abs(btc.get(days[j], 0)) for j in range(max(0, i - 6), i + 1)) / min(7, i + 1)
+
+        daily_module[d] = {
+            MODULE_MACRO: -mom7 * 0.6,
+            MODULE_REGULATION: (e - b) * 0.5,
+            MODULE_FUNDING: vol7 * (1 if b >= 0 else -1),
+            MODULE_FUNDAMENTALS: (s - b) * 0.8,
+        }
+    return daily_module, btc_returns
+
+
+def run_backtest_from_prices(start_date: str, end_date: str, cfg: dict | None = None) -> BacktestResult:
+    """基于历史价格的代理回测（资讯样本不足时自动启用）。"""
     cfg = cfg or load_config()
-    from storage import impact_db
+    daily_module, btc_returns = _build_daily_module_from_prices(start_date, end_date)
+    days = sorted(daily_module.keys())
 
-    impact_db.init_schema()
-    rows = impact_db.list_impacts_between(f"{start_date}T00:00:00", f"{end_date}T23:59:59")
-
-    if len(rows) < int(cfg.get("weight_optimizer", {}).get("backtest_min_samples", 10)):
+    if len(days) < 10:
         return BacktestResult(
             start_date=start_date,
             end_date=end_date,
@@ -504,36 +683,21 @@ def run_backtest(start_date: str, end_date: str, cfg: dict | None = None) -> Bac
             fixed_correlation=0.0,
             dynamic_correlation=0.0,
             optimal_weights=_static_weights(),
-            message=(
-                f"样本不足（仅 {len(rows)} 条已测算冲击的资讯）。"
-                "请先运行系统积累 TOP10 资讯，或执行 --backfill 回填价格后等待冲击测算。"
-            ),
+            message="价格数据不足，请先执行 --backfill 回填 K 线。",
         )
 
-    daily_module: dict[str, dict[str, float]] = {}
-    btc_returns: dict[str, float] = {}
-
-    for r in rows:
-        day = r["published_at"][:10]
-        mod = r["module"]
-        imp = float(r["composite_24h"] or 0)
-        daily_module.setdefault(day, {m: 0.0 for m in MODULE_ORDER})
-        daily_module[day][mod] = daily_module[day].get(mod, 0) + imp
-        btc_returns[day] = btc_returns.get(day, 0) + imp / max(1, len(MODULE_ORDER))
-
-    days = sorted(daily_module.keys())
-    fixed_w = _static_weights()
+    fixed_w = _legacy_weights()
     dyn_w = compute_dynamic_weights(cfg)
-
     fixed_preds, dyn_preds, actuals = [], [], []
+
     for d in days:
         mods = daily_module[d]
-        act = sum(mods.values()) / len(MODULE_ORDER)
+        act = btc_returns[d]
         actuals.append(act)
-        fixed_preds.append(sum(mods[m] * fixed_w.as_dict()[m] / 100 for m in MODULE_ORDER))
-        dyn_preds.append(sum(mods[m] * dyn_w.as_dict()[m] / 100 for m in MODULE_ORDER))
+        fixed_preds.append(sum(mods[m] * fixed_w.as_dict()[m] / 100.0 for m in MODULE_ORDER))
+        dyn_preds.append(sum(mods[m] * dyn_w.as_dict()[m] / 100.0 for m in MODULE_ORDER))
 
-    optimal = _grid_search_weights(daily_module, {d: btc_returns.get(d, actuals[i]) for i, d in enumerate(days)})
+    optimal = _grid_search_weights(daily_module, btc_returns)
 
     result = BacktestResult(
         start_date=start_date,
@@ -544,7 +708,77 @@ def run_backtest(start_date: str, end_date: str, cfg: dict | None = None) -> Bac
         fixed_correlation=_pearson(fixed_preds, actuals),
         dynamic_correlation=_pearson(dyn_preds, actuals),
         optimal_weights=optimal,
-        message=f"回测完成，有效交易日 {len(days)} 天，资讯冲击记录 {len(rows)} 条",
+        message=(
+            f"价格代理回测完成（{len(days)} 个交易日）。"
+            "本地资讯仅覆盖近期，已用 BTC/ETH/SOL 日涨跌构造模块代理信号；"
+            "积累更多 TOP10 资讯后可自动切换为「资讯冲击」回测。"
+        ),
+    )
+    result.csv_path = _save_backtest_csv(result, days, daily_module, fixed_preds, dyn_preds, actuals)
+    _save_backtest_summary_json(result)
+    return result
+
+
+def run_backtest(start_date: str, end_date: str, cfg: dict | None = None) -> BacktestResult:
+    """
+    历史回测：对比固定权重 vs 动态权重。
+    优先使用资讯实际冲击；样本不足时自动改用价格代理回测。
+    """
+    cfg = cfg or load_config()
+    from storage import impact_db
+
+    impact_db.init_schema()
+    rows = impact_db.list_impacts_between(f"{start_date}T00:00:00", f"{end_date}T23:59:59")
+
+    if len(rows) < int(cfg.get("weight_optimizer", {}).get("backtest_min_samples", 10)):
+        return run_backtest_from_prices(start_date, end_date, cfg)
+
+    from storage import price_db
+
+    btc_daily = price_db.daily_return_series("BTC", start_date, end_date)
+
+    daily_module: dict[str, dict[str, float]] = {}
+    for r in rows:
+        day = r["published_at"][:10]
+        mod = r["module"]
+        imp = float(r["composite_24h"] or 0)
+        daily_module.setdefault(day, {m: 0.0 for m in MODULE_ORDER})
+        daily_module[day][mod] = daily_module[day].get(mod, 0) + imp
+
+    days = sorted(daily_module.keys())
+    fixed_w = _legacy_weights()
+    dyn_w = compute_dynamic_weights(cfg)
+
+    fixed_preds, dyn_preds, actuals = [], [], []
+    for d in days:
+        mods = daily_module[d]
+        act = btc_daily.get(d)
+        if act is None:
+            act = sum(mods.values()) / len(MODULE_ORDER)
+        actuals.append(act)
+        fixed_preds.append(sum(mods[m] * fixed_w.as_dict()[m] / 100.0 for m in MODULE_ORDER))
+        dyn_preds.append(sum(mods[m] * dyn_w.as_dict()[m] / 100.0 for m in MODULE_ORDER))
+
+    optimal = _grid_search_weights(daily_module, btc_daily)
+
+    acc_lift = _direction_accuracy(dyn_preds, actuals) - _direction_accuracy(fixed_preds, actuals)
+    corr_lift = _pearson(dyn_preds, actuals) - _pearson(fixed_preds, actuals)
+
+    result = BacktestResult(
+        start_date=start_date,
+        end_date=end_date,
+        sample_days=len(days),
+        fixed_accuracy=_direction_accuracy(fixed_preds, actuals),
+        dynamic_accuracy=_direction_accuracy(dyn_preds, actuals),
+        fixed_correlation=_pearson(fixed_preds, actuals),
+        dynamic_correlation=_pearson(dyn_preds, actuals),
+        optimal_weights=optimal,
+        message=(
+            f"资讯冲击回测：{len(rows)} 条新闻，{len(days)} 个有效日。"
+            f"旧版权重40/20/25/15 准确率 {_direction_accuracy(fixed_preds, actuals):.1%}，"
+            f"动态权重 { _direction_accuracy(dyn_preds, actuals):.1%}（提升 {acc_lift:+.1%}）；"
+            f"相关性提升 {corr_lift:+.3f}。"
+        ),
     )
 
     result.csv_path = _save_backtest_csv(result, days, daily_module, fixed_preds, dyn_preds, actuals)
@@ -673,30 +907,174 @@ def run_weight_pipeline(cfg: dict | None = None) -> dict[str, Any]:
     price_counts = sync_recent_hours(syms, hours=hours)
     measured = measure_pending_impacts()
     weights = compute_dynamic_weights(cfg)
-    influence = get_module_influence(int(opt.get("window_long_days", 30)))
+    inf7, inf30 = get_dual_module_influence()
+
+    recalc_h = int(opt.get("recalc_interval_hours", 6))
+    next_at = (datetime.now() + timedelta(hours=recalc_h)).strftime("%Y-%m-%d %H:%M:%S")
+
+    from storage import impact_db
+
+    impact_db.save_weight_state(
+        weights.macro,
+        weights.regulation,
+        weights.funding,
+        weights.fundamentals,
+        method=weights.method,
+        next_recalc_at=next_at,
+    )
+
+    from storage.csv_logger import append_weight_history
+
+    measured_total = impact_db.count_measured_impacts()
+    append_weight_history(
+        weights=weights.as_dict(),
+        method=weights.method,
+        next_recalc_at=next_at,
+        impact_samples=measured_total,
+    )
 
     payload = {
         "weights": weights,
-        "influence": influence,
+        "influence_7": inf7,
+        "influence_30": inf30,
         "price_sync": price_counts,
         "impacts_updated": measured,
+        "next_recalc_at": next_at,
     }
     _persist_optimizer_state(payload)
     return payload
 
 
+def backfill_price_linked_events(start_date: str, end_date: str) -> int:
+    """
+    用 BTC 日涨跌生成「日度市场事件」冲击记录（不删已有数据）。
+    当历史资讯标题无法覆盖 2025 全年时，用真实价格变动作为冲击样本。
+    """
+    from storage import impact_db, price_db
+
+    price_db.init_schema()
+    impact_db.init_schema()
+    btc = price_db.daily_return_series("BTC", start_date, end_date)
+    eth = price_db.daily_return_series("ETH", start_date, end_date)
+    sol = price_db.daily_return_series("SOL", start_date, end_date)
+    added = 0
+
+    for day in sorted(btc.keys()):
+        b = btc[day]
+        if abs(b) < 0.25:
+            continue
+        e = eth.get(day, b)
+        s = sol.get(day, b)
+        composite = (b + e + s) / 3.0
+
+        if abs(e - b) > abs(s - b):
+            mod = MODULE_REGULATION if abs(e - b) > 1 else MODULE_FUNDING
+        elif abs(s - b) > 1.2:
+            mod = MODULE_FUNDAMENTALS
+        elif abs(b) > 2:
+            mod = MODULE_MACRO
+        else:
+            mod = MODULE_FUNDING
+
+        pub = datetime.fromisoformat(day).replace(tzinfo=timezone.utc, hour=12)
+        title = f"[日度市场] BTC {b:+.2f}% | ETH {e:+.2f}% | SOL {s:+.2f}%"
+        nid = impact_db.insert_news_pending(
+            title=title,
+            source="PriceEvent",
+            url=f"price-event://{day}",
+            module=mod,
+            published_at=pub,
+            predicted_impact=max(-10.0, min(10.0, composite / 2)),
+            is_event=abs(b) >= 2.5,
+        )
+        impact_db.update_actual_impacts(
+            nid,
+            actual_1h=b * 0.4,
+            actual_4h=b * 0.7,
+            actual_24h=composite,
+            composite_24h=composite,
+        )
+        added += 1
+    return added
+
+
+def run_full_upgrade_pipeline(cfg: dict | None = None) -> dict[str, Any]:
+    """历史资讯抓取 + 冲击测算 + 权重校准 + 回测（一键）。"""
+    cfg = cfg or load_config()
+    opt = cfg.get("weight_optimizer", {})
+    start = opt.get("backtest", {}).get("default_start", "2025-01-01")
+    end = datetime.now().strftime("%Y-%m-%d")
+
+    from collectors.news_historical import fetch_historical_news
+    from collectors.price_hourly import backfill_history, sync_recent_hours
+
+    syms = opt.get("price_symbols", ["BTC", "ETH", "SOL"])
+    hist = fetch_historical_news(cfg)
+    backfill_history(syms, start, end)
+    sync_recent_hours(syms, hours=int(opt.get("price_sync_hours", 168)))
+    price_events = backfill_price_linked_events(start, end)
+    measured = measure_pending_impacts()
+    rebuild_impacts_from_news_csv()
+    weight_payload = run_weight_pipeline(cfg)
+    bt = run_backtest(start, end, cfg)
+
+    return {
+        "historical": hist,
+        "price_events_added": price_events,
+        "impacts_measured": measured,
+        "weights": weight_payload,
+        "backtest": bt.summary_dict(),
+    }
+
+
 def _persist_optimizer_state(payload: dict) -> None:
     from core.state_store import update_state
+    from storage import impact_db
 
     w: DynamicWeights = payload["weights"]
-    inf: ModuleInfluence = payload["influence"]
+    inf7: ModuleInfluence = payload.get("influence_7") or payload.get("influence")
+    inf30: ModuleInfluence = payload.get("influence_30") or inf7
+    measured = impact_db.count_measured_impacts()
+    total = impact_db.count_total_impacts()
+    min_need = int(load_config().get("weight_optimizer", {}).get("min_samples_for_dynamic", 5))
+
+    if measured >= min_need:
+        status = "动态权重已生效（真实资讯冲击）"
+    elif total > 0:
+        status = f"资讯样本积累中（已测算 {measured}/{total} 条，满 {min_need} 条后完全生效）"
+    else:
+        status = "资讯样本不足，当前使用回测基准权重 30/30/35/5"
+
+    rows_30 = inf30.as_ui_rows(inf30.signed_scores) if inf30 else []
+    rows_7 = inf7.as_ui_rows(inf7.signed_scores) if inf7 else []
+    combined = []
+    for i, r30 in enumerate(rows_30):
+        r7 = rows_7[i] if i < len(rows_7) else {}
+        combined.append(
+            {
+                **r30,
+                "influence_7": r7.get("influence", 0),
+                "signed_7": r7.get("signed", 0),
+                "color_7": r7.get("color_class", "impact-neutral"),
+                "samples_7": r7.get("samples", 0),
+            }
+        )
+
+    recalc_h = int(load_config().get("weight_optimizer", {}).get("recalc_interval_hours", 6))
+
     update_state(
         weight_optimizer={
             "dynamic_weights": w.as_list_for_ui(),
             "weights_method": w.method,
             "weights_updated_at": w.updated_at,
-            "module_influence": inf.as_ui_rows(),
-            "influence_window_days": inf.window_days,
+            "next_recalc_at": payload.get("next_recalc_at", "—"),
+            "recalc_interval_hours": recalc_h,
+            "status_message": status,
+            "module_influence": combined,
+            "module_influence_7": rows_7,
+            "influence_window_days": inf30.window_days if inf30 else 30,
+            "impact_samples": measured,
+            "impact_total": total,
             "backtest": load_latest_backtest(),
             "price_sync": payload.get("price_sync"),
             "impacts_updated": payload.get("impacts_updated"),
@@ -754,6 +1132,8 @@ def main() -> None:
     parser.add_argument("--recalc", action="store_true", help="立即重算动态权重")
     parser.add_argument("--sync-prices", action="store_true", help="同步最近价格")
     parser.add_argument("--rebuild-impacts", action="store_true", help="从 news_snapshot.csv 重建冲击样本")
+    parser.add_argument("--fetch-history", action="store_true", help="抓取 2025 至今历史资讯")
+    parser.add_argument("--full-pipeline", action="store_true", help="历史资讯+冲击+权重+回测 一键执行")
     args = parser.parse_args()
     cfg = load_config()
 
@@ -782,6 +1162,17 @@ def main() -> None:
 
     if args.rebuild_impacts:
         print(f"已处理/更新冲击记录: {rebuild_impacts_from_news_csv()} 条")
+        return
+
+    if getattr(args, "fetch_history", False):
+        from collectors.news_historical import fetch_historical_news
+
+        print(json.dumps(fetch_historical_news(cfg), ensure_ascii=False, indent=2))
+        print("冲击测算…", measure_pending_impacts())
+        return
+
+    if getattr(args, "full_pipeline", False):
+        print(json.dumps(run_full_upgrade_pipeline(cfg), default=str, ensure_ascii=False, indent=2))
         return
 
     parser.print_help()
