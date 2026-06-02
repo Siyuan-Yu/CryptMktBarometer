@@ -27,9 +27,9 @@ def prepare_all_news_views(
     category_limit: int = 10,
 ) -> dict[str, list[dict[str, Any]]]:
     """
-    生成 TOP10 与三大分类列表。
+    生成 TOP10 与四大分类列表。
     - TOP10：加密 + 宏观合并排序
-    - SOL/ETH：仅加密池
+    - BTC/SOL/ETH：仅加密池
     - 宏观：仅宏观池（剔除加密关键词）
     """
     macro_items = macro_items or []
@@ -38,6 +38,13 @@ def prepare_all_news_views(
     return {
         "top": select_top_news(
             combined, limit=top_limit, to_display=news_item_to_display
+        ),
+        "btc": select_category_top(
+            crypto_items,
+            "btc",
+            limit=category_limit,
+            to_display=news_item_to_display,
+            pool="crypto",
         ),
         "sol": select_category_top(
             crypto_items,

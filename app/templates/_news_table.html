@@ -1,4 +1,17 @@
-{# 资讯表格：固定列宽 + 中文关键词胶囊 #}
+{# 资讯表格：全宽自适应 · 中文关键词胶囊 · 发布时间独立列 #}
+{% macro format_published_at(item) %}
+    {% set raw = item.published_at or (item.raw.published if item.raw else '') or '' %}
+    {% if raw and raw != '—' %}
+        {% if raw|length >= 16 %}
+            {{ raw[:16].replace('T', ' ') }}
+        {% else %}
+            {{ raw.replace('T', ' ') }}
+        {% endif %}
+    {% else %}
+        —
+    {% endif %}
+{% endmacro %}
+
 {% macro keyword_pills(item) %}
     {% set kws = item.keywords_cn or item.display_keywords or item.keywords or [] %}
     {% if kws %}
@@ -15,13 +28,14 @@
 {% macro news_rows(items) %}
     {% if items %}
         {% for item in items %}
-        <tr class="news-row-clickable" data-news-index="{{ loop.index0 }}" tabindex="0" role="button">
+        <tr class="news-row-clickable" data-news-table="asset-news-tbody" data-news-index="{{ loop.index0 }}" tabindex="0" role="button">
             <td class="col-idx">{{ loop.index }}</td>
             <td class="title-cell">{{ item.title_cn or item.display_title or item.title }}</td>
-            <td class="summary-cell"><div class="cell-scroll">{{ item.summary_cn or '—' }}</div></td>
+            <td class="summary-cell">{{ item.summary_cn or '—' }}</td>
             <td class="keywords-cell">{{ keyword_pills(item) }}</td>
+            <td class="time-cell">{{ format_published_at(item) }}</td>
             <td class="meta-cell">
-                <div class="cell-scroll meta-stack">
+                <div class="meta-stack meta-stack-row">
                     <span class="impact-cell {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
                         {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}
                     </span>
@@ -34,6 +48,6 @@
         </tr>
         {% endfor %}
     {% else %}
-        <tr><td colspan="5" class="empty-row">暂无该类资讯</td></tr>
+        <tr><td colspan="6" class="empty-row">暂无该类资讯，等待定时任务抓取…</td></tr>
     {% endif %}
 {% endmacro %}

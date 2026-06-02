@@ -40,6 +40,314 @@
         return Number.isNaN(t.getTime()) ? null : t;
     }
 
+    function formatPublishedAt(item) {
+        const raw =
+            (item && (item.published_at || item.published)) ||
+            (item && item.raw && (item.raw.published || item.raw.published_at)) ||
+            "";
+        if (!raw || raw === "—") return "—";
+        const t = parseTime(String(raw).replace("Z", ""));
+        if (t) {
+            const y = t.getFullYear();
+            const m = String(t.getMonth() + 1).padStart(2, "0");
+            const d = String(t.getDate()).padStart(2, "0");
+            const h = String(t.getHours()).padStart(2, "0");
+            const min = String(t.getMinutes()).padStart(2, "0");
+            return `${y}-${m}-${d} ${h}:${min}`;
+        }
+        const s = String(raw).replace("T", " ").trim();
+        return s.length >= 16 ? s.slice(0, 16) : s || "—";
+    }
+
+    const ASSET_META = {
+        btc: {
+            label: "BTC",
+            kicker: "☀ BTC 晴雨",
+            newsTitle: "📰 BTC 专属资讯",
+            newsHint:
+                "比特币现货 ETF · 灰度 · SEC · 矿工 · 链上 · 减半 · 机构持仓",
+        },
+        eth: {
+            label: "ETH",
+            kicker: "☀ ETH 晴雨",
+            newsTitle: "📰 ETH 专属资讯",
+            newsHint: "以太坊 · L2 · 质押 · ETF · SEC · 生态升级",
+        },
+        sol: {
+            label: "SOL",
+            kicker: "☀ SOL 晴雨",
+            newsTitle: "📰 SOL 专属资讯",
+            newsHint: "Solana 公链 · DeFi · 基金会 · 生态项目",
+        },
+        us: {
+            label: "美股大盘",
+            kicker: "☀ 美股晴雨",
+            newsTitle: "📰 美股 / 宏观资讯",
+            newsHint: "CPI · 美联储 · 美股 · 国债收益率 · 非农",
+        },
+    };
+
+    const WEIGHT_NUDGE = {
+        btc: {},
+        eth: { "ETH/SOL 币种基本面": 6, "资金链上数据": -4 },
+        sol: { "ETH/SOL 币种基本面": 8, "宏观数据": -4 },
+        us: {
+            "宏观数据": 12,
+            "全球监管政策": 3,
+            "资金链上数据": -8,
+            "ETH/SOL 币种基本面": -7,
+        },
+    };
+
+    let activeAsset = "btc";
+    let scoreChart = null;
+
+    function chartTitleFor(assetId) {
+        const meta = ASSET_META[assetId] || ASSET_META.btc;
+        return `📈 ${meta.label} · 分数历史走势`;
+    }
+
+    function initScoreChart() {
+        if (typeof ScoreChart === "undefined") return;
+        scoreChart = ScoreChart.create("score-chart-root");
+        if (scoreChart) scoreChart.setAsset(activeAsset);
+    }
+
+    async function refreshScoreHistory() {
+        if (!scoreChart) return;
+        const since = cfg.scoreHistorySince || "2026-01-01";
+        try {
+            const res = await fetch(
+                `/api/score-history?since=${encodeURIComponent(since)}`,
+                { cache: "no-store" }
+            );
+            if (!res.ok) return;
+            const data = await res.json();
+            scoreChart.setSeries(data.series || {});
+            scoreChart.setAsset(activeAsset);
+        } catch (e) {
+            console.warn("score history load failed", e);
+        }
+    }
+
+    function deepClone(obj) {
+        return JSON.parse(JSON.stringify(obj || null));
+    }
+
+    function clamp(n, lo, hi) {
+        return Math.max(lo, Math.min(hi, n));
+    }
+
+    function avgImpact(items) {
+        if (!items || !items.length) return 0;
+        const sum = items.reduce(
+            (s, it) => s + (Number(it.impact_score) || 0),
+            0
+        );
+        return sum / items.length;
+    }
+
+    function nudgeWeights(rows, nudges) {
+        const out = deepClone(rows || []);
+        if (!out.length) return out;
+        out.forEach((r) => {
+            if (nudges[r.name]) r.weight = (Number(r.weight) || 0) + nudges[r.name];
+        });
+        let sum = out.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+        if (sum <= 0) return out;
+        out.forEach((r) => {
+            r.weight = Math.round(((Number(r.weight) || 0) * 100) / sum);
+            r.bar_percent = r.weight;
+        });
+        const fix = 100 - out.reduce((s, r) => s + r.weight, 0);
+        if (fix && out[0]) out[0].weight += fix;
+        return out;
+    }
+
+    function adjustCategoriesForAsset(categories, assetId, data) {
+        const cats = deepClone(categories || []);
+        const ethAvg = avgImpact(data.eth_news);
+        const solAvg = avgImpact(data.sol_news);
+        const macroAvg = avgImpact(data.macro_news);
+        const btcAvg = avgImpact(data.btc_news);
+
+        const nudge = (idx, delta, summary) => {
+            if (!cats[idx] || cats[idx].score == null) return;
+            cats[idx].score = clamp(Number(cats[idx].score) + delta, 0, 100);
+            if (summary) cats[idx].summary = summary;
+        };
+
+        if (assetId === "eth" && cats[3]) {
+            nudge(
+                3,
+                ethAvg * 2.5,
+                `ETH 专属 ${(data.eth_news || []).length} 条 · 均冲击 ${ethAvg.toFixed(1)}`
+            );
+        } else if (assetId === "sol" && cats[3]) {
+            nudge(
+                3,
+                solAvg * 2.5,
+                `SOL 专属 ${(data.sol_news || []).length} 条 · 均冲击 ${solAvg.toFixed(1)}`
+            );
+        } else if (assetId === "us") {
+            nudge(
+                0,
+                macroAvg * 2.2,
+                `宏观/美股 ${(data.macro_news || []).length} 条 · 均冲击 ${macroAvg.toFixed(1)}`
+            );
+            nudge(1, macroAvg * 0.8);
+            if (cats[2]) cats[2].score = clamp(Number(cats[2].score) - 2, 0, 100);
+        } else if (assetId === "btc" && cats[2]) {
+            nudge(
+                2,
+                btcAvg * 1.2,
+                `BTC 专属 ${(data.btc_news || []).length} 条 · 均冲击 ${btcAvg.toFixed(1)}`
+            );
+        }
+        return cats;
+    }
+
+    function calcWeightedTotal(categories, weights) {
+        const wm = {};
+        (weights || []).forEach((w) => {
+            if (w.name) wm[w.name] = Number(w.weight);
+        });
+        let sum = 0;
+        let tw = 0;
+        (categories || []).forEach((c) => {
+            const w = wm[c.name] ?? Number(c.weight) ?? 25;
+            if (c.score == null) return;
+            sum += Number(c.score) * w;
+            tw += w;
+        });
+        return tw > 0 ? sum / tw : null;
+    }
+
+    function ratingLabelFromScore(total) {
+        const s = Number(total);
+        if (Number.isNaN(s)) return "待计算";
+        if (s > 70) return "强利多";
+        if (s >= 55) return "偏利多";
+        if (s >= 45) return "中性";
+        if (s >= 30) return "偏利空";
+        return "强利空";
+    }
+
+    function ratingClassFromScore(total) {
+        const s = Number(total);
+        if (Number.isNaN(s)) return "rating-neutral";
+        if (s > 70) return "rating-bull-strong";
+        if (s >= 55) return "rating-bull";
+        if (s >= 45) return "rating-neutral";
+        if (s >= 30) return "rating-bear";
+        return "rating-bear-strong";
+    }
+
+    function newsForAsset(assetId, data) {
+        switch (assetId) {
+            case "eth":
+                return data.eth_news || [];
+            case "sol":
+                return data.sol_news || [];
+            case "us":
+                return data.macro_news || [];
+            default:
+                return data.btc_news || data.top_news || [];
+        }
+    }
+
+    function buildAssetView(assetId, data) {
+        const news = newsForAsset(assetId, data);
+        if (assetId === "btc") {
+            return {
+                categories: data.categories,
+                weights: (data.weight_optimizer || {}).dynamic_weights,
+                total_score: data.total_score,
+                rating_label: data.rating_label,
+                rating_class: data.rating_class,
+                news,
+            };
+        }
+        const weights = nudgeWeights(
+            (data.weight_optimizer || {}).dynamic_weights,
+            WEIGHT_NUDGE[assetId] || {}
+        );
+        const categories = adjustCategoriesForAsset(
+            data.categories,
+            assetId,
+            data
+        );
+        const total = calcWeightedTotal(categories, weights);
+        return {
+            categories,
+            weights,
+            total_score: total,
+            rating_label:
+                total != null ? ratingLabelFromScore(total) : data.rating_label,
+            rating_class:
+                total != null ? ratingClassFromScore(total) : data.rating_class,
+            news,
+        };
+    }
+
+    function updateAssetChrome(assetId) {
+        const meta = ASSET_META[assetId] || ASSET_META.btc;
+        const kicker = $("gauge-kicker");
+        if (kicker) kicker.textContent = meta.kicker;
+        const nt = $("asset-news-panel-title");
+        if (nt) nt.textContent = meta.newsTitle;
+        const nh = $("asset-news-panel-hint");
+        if (nh) nh.textContent = meta.newsHint;
+        const ct = $("score-chart-title");
+        if (ct) ct.textContent = chartTitleFor(assetId);
+        document.querySelectorAll(".asset-pill").forEach((btn) => {
+            const on = btn.getAttribute("data-asset") === assetId;
+            btn.classList.toggle("is-active", on);
+            btn.setAttribute("aria-selected", on ? "true" : "false");
+        });
+    }
+
+    function applyAssetView(assetId) {
+        const data = window.__dashboardRaw;
+        if (!data) return;
+        activeAsset = assetId;
+        try {
+            localStorage.setItem("barometer_asset", assetId);
+        } catch (e) {
+            /* ignore */
+        }
+        const view = buildAssetView(assetId, data);
+        updateAssetChrome(assetId);
+        renderScore(
+            view.categories,
+            view.total_score,
+            view.rating_label,
+            view.rating_class
+        );
+        renderWeightScoreStrip(view.categories, view.weights);
+        renderNewsTable("asset-news-tbody", view.news);
+        renderNewsTicker((window.__dashboardRaw || {}).top_news);
+        if (scoreChart) scoreChart.setAsset(assetId);
+    }
+
+    function bindAssetSwitcher() {
+        try {
+            const saved = localStorage.getItem("barometer_asset");
+            if (saved && ASSET_META[saved]) activeAsset = saved;
+        } catch (e) {
+            /* ignore */
+        }
+        document.addEventListener("click", (e) => {
+            const btn = e.target.closest(".asset-pill");
+            if (!btn) return;
+            const nav = btn.closest(".asset-switcher, .asset-switcher-dock");
+            if (!nav) return;
+            const id = btn.getAttribute("data-asset");
+            if (!id || !ASSET_META[id]) return;
+            applyAssetView(id);
+        });
+    }
+
     function updateCountdown(nextAt, el) {
         if (!el) return;
         const target = parseTime(nextAt);
@@ -59,6 +367,7 @@
 
     function tagClass(label) {
         const map = {
+            "BTC生态": "tag-btc",
             "SOL生态": "tag-sol",
             "ETH生态": "tag-eth",
             美股宏观: "tag-macro",
@@ -88,10 +397,12 @@
         const label =
             item.category_label || item.source_tag || "全市场加密";
         const sign = score > 0 ? "+" : "";
+        const pub = formatPublishedAt(item);
         return `<button type="button" class="ticker-chip" data-news-open="${rank - 1}" aria-label="查看资讯详情">
         <span class="cat-tag ${tagClass(label)}">${esc(label)}</span>
         <span class="ticker-chip-rank">#${rank}</span>
         <span class="ticker-chip-title">${esc(title)}</span>
+        <span class="ticker-chip-time">${esc(pub)}</span>
         <span class="ticker-chip-score ${ic}">${sign}${score}分</span>
       </button>`;
     }
@@ -131,6 +442,8 @@
                       : "";
         }
         if (srcEl) srcEl.textContent = item.source || "—";
+        const pubEl = $("news-modal-published");
+        if (pubEl) pubEl.textContent = formatPublishedAt(item);
         if (linkEl) {
             if (item.url) {
                 linkEl.innerHTML = `<a href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`;
@@ -176,7 +489,7 @@
 
         if (!items || !items.length) {
             tbody.innerHTML =
-                '<tr><td colspan="5" class="empty-row">暂无该类资讯</td></tr>';
+                '<tr><td colspan="6" class="empty-row">暂无该类资讯，等待定时任务抓取…</td></tr>';
             return;
         }
         tbody.innerHTML = items
@@ -194,12 +507,14 @@
                     ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" class="meta-link" onclick="event.stopPropagation()">原文</a>`
                     : "";
                 const sign = score > 0 ? "+" : "";
+                const pub = formatPublishedAt(item);
                 return `<tr class="news-row-clickable" data-news-table="${esc(tbodyId)}" data-news-index="${i}" tabindex="0" role="button">
           <td class="col-idx">${i + 1}</td>
           <td class="title-cell">${esc(title)}</td>
-          <td class="summary-cell"><div class="cell-scroll">${esc(summary)}</div></td>
+          <td class="summary-cell">${esc(summary)}</td>
           <td class="keywords-cell">${keywordPillsHtml(item)}</td>
-          <td class="meta-cell"><div class="cell-scroll meta-stack">
+          <td class="time-cell">${esc(pub)}</td>
+          <td class="meta-cell"><div class="meta-stack meta-stack-row">
             <span class="impact-cell ${ic}">${sign}${score}</span>
             <span class="meta-source">${esc(item.source || "")}</span>
             ${link}
@@ -469,18 +784,9 @@
             if (wo.status_message && $("weight-status"))
                 $("weight-status").textContent = wo.status_message;
 
-            renderScore(
-                data.categories,
-                data.total_score,
-                data.rating_label,
-                data.rating_class
-            );
-            renderWeightScoreStrip(data.categories, wo.dynamic_weights);
-            renderNewsTicker(data.top_news);
-            renderNewsTable("news-tbody", data.top_news);
-            renderNewsTable("sol-news-tbody", data.sol_news);
-            renderNewsTable("eth-news-tbody", data.eth_news);
-            renderNewsTable("macro-news-tbody", data.macro_news);
+            window.__dashboardRaw = data;
+            applyAssetView(activeAsset);
+            await refreshScoreHistory();
             renderWeights(wo.dynamic_weights);
             renderInfluence(wo.module_influence);
             renderBacktest(wo.backtest);
@@ -549,6 +855,9 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
+        bindAssetSwitcher();
+        initScoreChart();
+        refreshScoreHistory();
         bindNewsModal();
         refreshPrices();
         refreshDashboard();

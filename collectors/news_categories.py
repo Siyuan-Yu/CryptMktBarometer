@@ -1,5 +1,5 @@
 """
-资讯分类过滤：SOL / ETH / 美股宏观 独立 TOP 列表
+资讯分类过滤：BTC / SOL / ETH / 美股宏观 独立 TOP 列表
 加密池与宏观池分离；宏观板块剔除加密关键词。
 """
 
@@ -9,6 +9,27 @@ import re
 from typing import Any
 
 from collectors.types import NewsItem
+
+# BTC 生态（现货 ETF、灰度、SEC、矿工、链上、减半、机构持仓）
+_BTC_PATTERNS = re.compile(
+    r"\b(bitcoin|\bbtc\b|\$btc|satosh|halving|hash rate|hashrate|"
+    r"miner|mining|microstrategy|mstr|grayscale|gbtc|bitcoin etf|spot btc|"
+    r"btc etf|blackrock.*btc|fidelity.*btc|sec.*btc|btc.*sec|"
+    r"on-chain|onchain|whale|institutional|treasury.*btc|coinbase.*custody|"
+    r"灰度|比特币|减半|矿工|链上|现货etf|机构持仓|etf流入|etf流出)\b",
+    re.I,
+)
+
+_BTC_BLOCK = re.compile(
+    r"\b(solana|\bsol\b|\$sol|ethereum|\beth\b|\$eth|bonk|jito|"
+    r"cpi|nonfarm|fomc|powell|treasury yield|s&p 500|nasdaq composite)\b",
+    re.I,
+)
+
+_BTC_RELAXED = re.compile(
+    r"\b(bitcoin|\bbtc\b|\$btc|比特币|btc etf|bitcoin etf)\b",
+    re.I,
+)
 
 # SOL 生态（公链 / 基金会 / Pay.sh / 链上升级）
 _SOL_PATTERNS = re.compile(
@@ -109,17 +130,46 @@ def classify_news_tag(item: NewsItem) -> str:
         return "SOL生态"
     if "以太坊" in item.source or "ethereum" in src:
         return "ETH生态"
+    btc = is_btc_related(item, relaxed=True)
     sol = is_sol_related(item, relaxed=True)
     eth = is_eth_related(item, relaxed=True)
-    if sol and not eth:
+    if btc and not sol and not eth:
+        return "BTC生态"
+    if sol and not eth and not btc:
         return "SOL生态"
-    if eth and not sol:
+    if eth and not sol and not btc:
         return "ETH生态"
+    if btc:
+        return "BTC生态"
     if sol:
         return "SOL生态"
     if eth:
         return "ETH生态"
     return "全市场加密"
+
+
+def is_btc_related(item: NewsItem, *, relaxed: bool = False) -> bool:
+    if item.feed_type == "macro":
+        return False
+    codes = _currency_codes(item)
+    if "ETH" in codes or "SOL" in codes:
+        if "BTC" not in codes:
+            return False
+    if "BTC" in codes and "ETH" not in codes and "SOL" not in codes:
+        return True
+    text = _item_text(item)
+    pat = _BTC_RELAXED if relaxed else _BTC_PATTERNS
+    if not pat.search(text):
+        return False
+    if _BTC_BLOCK.search(text) and not re.search(
+        r"\b(bitcoin|\bbtc\b|\$btc|halving|grayscale|gbtc|etf)\b", text, re.I
+    ):
+        return False
+    if is_macro_related(item, allow_crypto_context=True) and not re.search(
+        r"\b(bitcoin|\bbtc\b|\$btc)\b", text, re.I
+    ):
+        return False
+    return True
 
 
 def is_sol_related(item: NewsItem, *, relaxed: bool = False) -> bool:
@@ -193,8 +243,10 @@ def filter_by_category(
     *,
     relaxed: bool = False,
 ) -> list[NewsItem]:
-    """category: sol | eth | macro"""
-    if category == "sol":
+    """category: btc | sol | eth | macro"""
+    if category == "btc":
+        fn = lambda i: is_btc_related(i, relaxed=relaxed)
+    elif category == "sol":
         fn = lambda i: is_sol_related(i, relaxed=relaxed)
     elif category == "eth":
         fn = lambda i: is_eth_related(i, relaxed=relaxed)
@@ -259,8 +311,9 @@ def select_category_top(
         macro_only = [i for i in candidates if i.feed_type == "macro" and not is_crypto_topic(i)]
         filtered = _dedupe_news(filtered + macro_only)
 
-    if category in ("sol", "eth") and len(filtered) < limit:
-        codes = "SOL" if category == "sol" else "ETH"
+    if category in ("btc", "sol", "eth") and len(filtered) < limit:
+        code_map = {"btc": "BTC", "sol": "SOL", "eth": "ETH"}
+        codes = code_map[category]
         for it in candidates:
             if codes in _currency_codes(it):
                 filtered.append(it)

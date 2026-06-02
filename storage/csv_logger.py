@@ -150,6 +150,24 @@ def append_score_history(
     return file_path
 
 
+def read_score_history(*, since: str = "2026-01-01") -> list[dict[str, str]]:
+    """读取计分历史 CSV（since 为 YYYY-MM-DD，含当日）。"""
+    file_path = _log_dir() / SCORE_LOG_FILENAME
+    if not file_path.exists():
+        return []
+
+    since_dt = f"{since} 00:00:00"
+    rows: list[dict[str, str]] = []
+    with open(file_path, newline="", encoding="utf-8-sig") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            ts = (row.get("fetch_time") or "").strip()
+            if not ts or ts < since_dt:
+                continue
+            rows.append({k: (v or "").strip() for k, v in row.items()})
+    return rows
+
+
 def append_weight_history(
     *,
     weights: dict[str, int],

@@ -1,7 +1,15 @@
 {# TOP10 横向滚动：中文标题 + 分值，点击查看详情 #}
+{% macro format_published_at(item) %}
+    {% set raw = item.published_at or (item.raw.published if item.raw else '') or '' %}
+    {% if raw and raw != '—' %}
+        {% if raw|length >= 16 %}{{ raw[:16].replace('T', ' ') }}{% else %}{{ raw.replace('T', ' ') }}{% endif %}
+    {% else %}—{% endif %}
+{% endmacro %}
+
 {% macro category_tag_class(label) %}
     {% if label == 'SOL生态' %}tag-sol
     {% elif label == 'ETH生态' %}tag-eth
+    {% elif label == 'BTC生态' %}tag-btc
     {% elif label == '美股宏观' %}tag-macro
     {% else %}tag-crypto{% endif %}
 {% endmacro %}
@@ -12,6 +20,7 @@
     <span class="cat-tag {{ category_tag_class(label) }}">{{ label }}</span>
     <span class="ticker-chip-rank">#{{ rank }}</span>
     <span class="ticker-chip-title">{{ item.title_cn or item.display_title or item.title }}</span>
+    <span class="ticker-chip-time">{{ format_published_at(item) }}</span>
     <span class="ticker-chip-score {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
         {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}分
     </span>

@@ -31,4 +31,5 @@ class NewsItem:
             "keywords": self.keywords[:5],
             "logic": self.logic,
             "feed_type": self.feed_type,
+            "published_at": self.published_at,
         }

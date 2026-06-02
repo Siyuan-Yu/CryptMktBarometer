@@ -50,6 +50,7 @@
             <dl class="news-modal-meta">
                 <dt>影响分值</dt><dd id="news-modal-score"></dd>
                 <dt>来源</dt><dd id="news-modal-source"></dd>
+                <dt>发布时间</dt><dd id="news-modal-published"></dd>
                 <dt>原文链接</dt><dd id="news-modal-link"></dd>
             </dl>
         </div>
@@ -59,9 +60,20 @@
         window.DASHBOARD_CONFIG = {
             refreshSeconds: {{ dashboard_refresh_seconds | default(30) }},
             priceRefreshSeconds: {{ price_refresh_seconds | default(5) }},
-            backtestStart: "{{ backtest_default_start | default('2025-01-01') }}"
+            backtestStart: "{{ backtest_default_start | default('2025-01-01') }}",
+            scoreHistorySince: "2026-01-01"
         };
     </script>
+    <nav class="asset-switcher-dock glass capsule" id="asset-switcher-dock" aria-label="品种固定切换">
+        <span class="dock-label">☀ 切换</span>
+        <div class="dock-pills" role="tablist">
+            <button type="button" class="asset-pill dock-pill is-active" role="tab" aria-selected="true" data-asset="btc">BTC</button>
+            <button type="button" class="asset-pill dock-pill" role="tab" aria-selected="false" data-asset="eth">ETH</button>
+            <button type="button" class="asset-pill dock-pill" role="tab" aria-selected="false" data-asset="sol">SOL</button>
+            <button type="button" class="asset-pill dock-pill" role="tab" aria-selected="false" data-asset="us">美股</button>
+        </div>
+    </nav>
+    <script src="{{ url_for('static', filename='js/score_chart.js') }}"></script>
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </body>
 </html>

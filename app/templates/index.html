@@ -4,7 +4,18 @@
 
 {% block content %}
 
-<!-- ========== ① 顶部大号实时价格（永久显示 · 5秒刷新） ========== -->
+<!-- ========== ① 顶部 · 四大板块切换（桌面端由右侧悬浮栏接管，此处仅作备用） ========== -->
+<nav class="asset-switcher asset-switcher-inline glass capsule" id="asset-switcher" aria-label="资讯板块切换" hidden>
+    <span class="asset-switcher-label">☀ 切换板块</span>
+    <div class="asset-switcher-pills" role="tablist">
+        <button type="button" class="asset-pill is-active" role="tab" aria-selected="true" data-asset="btc" id="asset-pill-btc">BTC</button>
+        <button type="button" class="asset-pill" role="tab" aria-selected="false" data-asset="eth" id="asset-pill-eth">ETH</button>
+        <button type="button" class="asset-pill" role="tab" aria-selected="false" data-asset="sol" id="asset-pill-sol">SOL</button>
+        <button type="button" class="asset-pill" role="tab" aria-selected="false" data-asset="us" id="asset-pill-us">美股大盘</button>
+    </div>
+</nav>
+
+<!-- ========== ② 实时价格（5秒刷新） ========== -->
 <section class="price-hero-strip" id="price-hero-strip" aria-label="实时价格">
     <div class="price-hero glass capsule" id="price-btc" data-coin="BTC">
         <div class="price-hero-icon">₿</div>
@@ -40,8 +51,9 @@
     </p>
 </section>
 
-<!-- ========== ② 中央大型圆形晴雨表盘（与悬浮球同风格） ========== -->
-<section class="hub-stage" id="hub-stage" aria-label="中央晴雨表盘">
+<!-- ========== ③ 晴雨表 + 分数历史走势图 ========== -->
+<section class="hub-dashboard-row" id="hub-dashboard-row">
+<section class="hub-stage hub-stage-compact" id="hub-stage" aria-label="中央晴雨表盘">
     <div class="hub-glow hub-glow-a"></div>
     <div class="hub-glow hub-glow-b"></div>
     <div class="hub-center">
@@ -78,7 +90,7 @@
                     stroke-dasharray="1017.88" stroke-dashoffset="1017.88"/>
             </svg>
             <div class="gauge-face">
-                <span class="gauge-kicker">☀ 加密晴雨</span>
+                <span class="gauge-kicker" id="gauge-kicker">☀ BTC 晴雨</span>
                 <p class="gauge-score" id="gauge-score">{% if total_score is not none %}{{ total_score | round(0) | int }}{% else %}—{% endif %}</p>
                 <p class="gauge-unit">综合得分 / 100</p>
                 <p class="gauge-rating {{ rating_class }}" id="gauge-rating">{{ rating_label }}</p>
@@ -94,7 +106,16 @@
     </div>
 </section>
 
-<!-- ========== ②b 四大分项权重 + 得分（圆盘下方） ========== -->
+<section class="score-chart-panel glass capsule panel-readable" id="score-chart-panel" aria-label="分数历史走势">
+    <div class="score-chart-head">
+        <h2 class="panel-title score-chart-title" id="score-chart-title">📈 BTC · 分数历史走势</h2>
+        <p class="panel-hint" id="score-chart-hint">2026 年初至今 · 悬停圆点查看分数与时间</p>
+    </div>
+    <div class="score-chart-body" id="score-chart-root"></div>
+</section>
+</section>
+
+<!-- ========== ③b 四大分项权重 + 得分 ========== -->
 <section class="weight-score-strip" id="weight-score-strip" aria-label="分项权重与得分">
     {% for cat in categories %}
     {% set dw = (weight_optimizer.dynamic_weights or [])[loop.index0] if weight_optimizer.dynamic_weights else none %}
@@ -106,7 +127,30 @@
     {% endfor %}
 </section>
 
-<!-- ========== ③ TOP10 横向滚动（标题+分值 · 点击查看详情） ========== -->
+<!-- ========== ④ 当前板块 · 全屏宽资讯列表 ========== -->
+<section class="asset-news-stage" id="asset-news-stage" aria-live="polite">
+    <section class="panel panel-readable panel-asset-news" id="panel-asset-news">
+        <h2 class="panel-title" id="asset-news-panel-title">📰 BTC 专属资讯</h2>
+        <p class="panel-hint" id="asset-news-panel-hint">比特币现货 ETF · 灰度 · SEC · 矿工 · 链上 · 减半 · 机构持仓</p>
+        <div class="table-wrap table-wrap-fluid">
+            <table class="data-table news-table news-table-fluid">
+                <thead>
+                    <tr>
+                        <th class="th-idx">#</th>
+                        <th class="th-title">中文标题</th>
+                        <th class="th-summary">中文摘要</th>
+                        <th class="th-kw">关键词</th>
+                        <th class="th-time">发布时间</th>
+                        <th class="th-meta">影响分 · 来源 · 链接</th>
+                    </tr>
+                </thead>
+                <tbody id="asset-news-tbody">{{ news_rows(btc_news or top_news) }}</tbody>
+            </table>
+        </div>
+    </section>
+</section>
+
+<!-- ========== ⑤ 底部 · TOP10 横向滚动 ========== -->
 <section class="panel panel-ticker panel-readable panel-full" id="panel-news-ticker">
     <div class="ticker-header">
         <h2 class="panel-title">📡 TOP10 重磅资讯 · 横向滚动</h2>
@@ -119,11 +163,11 @@
     </div>
 </section>
 
-<!-- ========== ④ 环绕模块（信息完整保留） ========== -->
-<div class="orbit-grid">
+<!-- ========== ⑥ 高级数据（计分/权重/回测/日志） ========== -->
+<div class="orbit-grid orbit-grid-compact">
 
 <section class="panel panel-a panel-readable" id="panel-score">
-    <h2 class="panel-title">板块 A · 大盘晴雨计分总表</h2>
+    <h2 class="panel-title">板块 A · 晴雨计分总表</h2>
     <p class="panel-hint">分项得分与权重 · 与中央圆盘同步</p>
     <div class="table-wrap">
         <table class="data-table score-table">
@@ -147,57 +191,6 @@
                     <td><span class="rating-tag {{ rating_class }}" id="rating-tag">{{ rating_label }}</span></td>
                 </tr>
             </tfoot>
-        </table>
-    </div>
-</section>
-
-<section class="panel panel-b panel-readable panel-full" id="panel-news">
-    <h2 class="panel-title">板块 B · TOP10 完整列表</h2>
-    <div class="table-wrap">
-        <table class="data-table news-table news-table-fixed">
-            <colgroup>
-                <col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta">
-            </colgroup>
-            <thead>
-                <tr><th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值·来源·链接</th></tr>
-            </thead>
-            <tbody id="news-tbody">{{ news_rows(top_news) }}</tbody>
-        </table>
-    </div>
-</section>
-
-<section class="panel panel-g panel-readable" id="panel-sol">
-    <h2 class="panel-title">板块 G · SOL 专属 TOP</h2>
-    <p class="panel-hint">仅 Solana / SOL 生态相关</p>
-    <div class="table-wrap">
-        <table class="data-table news-table news-table-fixed">
-            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
-            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
-            <tbody id="sol-news-tbody">{{ news_rows(sol_news) }}</tbody>
-        </table>
-    </div>
-</section>
-
-<section class="panel panel-h panel-readable" id="panel-eth">
-    <h2 class="panel-title">板块 H · ETH 专属 TOP</h2>
-    <p class="panel-hint">以太坊 / L2 生态相关</p>
-    <div class="table-wrap">
-        <table class="data-table news-table news-table-fixed">
-            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
-            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
-            <tbody id="eth-news-tbody">{{ news_rows(eth_news) }}</tbody>
-        </table>
-    </div>
-</section>
-
-<section class="panel panel-i panel-readable" id="panel-macro-news">
-    <h2 class="panel-title">板块 I · 宏观 / 美股 TOP</h2>
-    <p class="panel-hint">CPI · 美联储 · 美股 · 国债收益率</p>
-    <div class="table-wrap">
-        <table class="data-table news-table news-table-fixed">
-            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
-            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
-            <tbody id="macro-news-tbody">{{ news_rows(macro_news) }}</tbody>
         </table>
     </div>
 </section>
@@ -298,9 +291,9 @@
 <footer class="site-footer usage-guide capsule">
     <h3 class="guide-title">使用说明</h3>
     <ol class="guide-list">
-        <li>顶部三币价格每 {{ price_refresh_seconds | default(5) }} 秒刷新</li>
-        <li>中央圆盘 = 悬浮球同款晴雨表</li>
-        <li>资讯区自动滚动播报，下方可查看完整表格</li>
+        <li>顶部切换 BTC / ETH / SOL / 美股，下方资讯与圆盘分数同步切换</li>
+        <li>资讯区全屏宽展示，文字自动换行不重叠</li>
+        <li>底部 TOP10 横向滚动 · 三币价格每 {{ price_refresh_seconds | default(5) }} 秒刷新</li>
     </ol>
 </footer>
 {% endblock %}

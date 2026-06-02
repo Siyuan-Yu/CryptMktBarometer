@@ -87,7 +87,7 @@ body.firefly-ui {
 .main-content {
     max-width: 1280px;
     margin: 0 auto;
-    padding: 0 1rem 2.5rem;
+    padding: 0 calc(1rem + 82px) 2.5rem 1rem;
 }
 
 .glass {
@@ -224,6 +224,491 @@ body.firefly-ui {
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
     50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+/* =============================================================================
+   币种 / 美股切换栏
+   ============================================================================= */
+.asset-switcher {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem 1rem;
+    margin: 0 0 1rem;
+    padding: 0.65rem 1rem;
+    border: 1px solid rgba(200, 220, 255, 0.85);
+}
+
+.asset-switcher-label {
+    font-size: 0.78rem;
+    font-weight: 800;
+    color: #7a8fc8;
+    white-space: nowrap;
+}
+
+.asset-switcher-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: center;
+}
+
+.asset-pill {
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
+    padding: 0.45rem 1.15rem;
+    border-radius: var(--ff-pill);
+    border: 2px solid rgba(180, 210, 255, 0.65);
+    background: rgba(255, 255, 255, 0.72);
+    color: #6a8ab8;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    box-shadow: 0 2px 8px rgba(120, 160, 220, 0.08);
+}
+
+.asset-pill:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px rgba(140, 180, 240, 0.18);
+    border-color: #a8c8ff;
+}
+
+.asset-pill.is-active {
+    background: linear-gradient(135deg, #d8ecff, #f0e4ff);
+    color: #4a6a9a;
+    border-color: #8ab4ff;
+    box-shadow: 0 0 18px rgba(138, 180, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.asset-pill:focus-visible {
+    outline: 2px solid #8ab4ff;
+    outline-offset: 2px;
+}
+
+/* 顶部内联切换栏（已由右侧悬浮栏替代） */
+.asset-switcher-inline {
+    display: none !important;
+}
+
+/* 右侧固定悬浮切换栏（永远可见 · 屏幕右侧居中） */
+.asset-switcher-dock {
+    position: fixed;
+    right: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.45rem;
+    padding: 0.75rem 0.55rem;
+    min-width: 68px;
+    border: 2px solid rgba(180, 210, 255, 0.85);
+    border-radius: var(--ff-r-lg);
+    box-shadow:
+        0 8px 32px rgba(100, 150, 220, 0.22),
+        0 0 0 1px rgba(255, 255, 255, 0.9) inset;
+    pointer-events: auto;
+    opacity: 1;
+    visibility: visible;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(18px) saturate(1.15);
+    -webkit-backdrop-filter: blur(18px) saturate(1.15);
+}
+
+.dock-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #6a8fd8;
+    text-align: center;
+    line-height: 1.2;
+    padding: 0 0.1rem 0.2rem;
+    letter-spacing: 0.02em;
+}
+
+.dock-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+
+.dock-pill {
+    padding: 0.62rem 0.75rem;
+    font-size: 0.88rem;
+    font-weight: 800;
+    min-width: 56px;
+    text-align: center;
+    color: #4a6a9a;
+    border: 2px solid rgba(160, 195, 240, 0.75);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 10px rgba(120, 160, 220, 0.12);
+}
+
+.dock-pill:hover {
+    transform: translateX(-2px);
+    border-color: #8ab4ff;
+    background: linear-gradient(135deg, #eef6ff, #f8f0ff);
+    box-shadow: 0 4px 14px rgba(130, 170, 240, 0.22);
+}
+
+.dock-pill.is-active {
+    transform: none;
+    color: #2a4a78;
+    border-color: #6a98ff;
+    background: linear-gradient(135deg, #cce4ff, #e8d8ff);
+    box-shadow:
+        0 0 0 2px rgba(120, 160, 255, 0.35),
+        0 4px 18px rgba(120, 160, 240, 0.28);
+}
+
+.dock-pill[data-asset="btc"].is-active {
+    border-color: #e8b848;
+    background: linear-gradient(135deg, #fff4d8, #ffe8c8);
+    color: #8a6020;
+    box-shadow: 0 0 0 2px rgba(232, 184, 72, 0.35), 0 4px 16px rgba(232, 184, 72, 0.25);
+}
+
+.dock-pill[data-asset="eth"].is-active {
+    border-color: #7aa8ff;
+    background: linear-gradient(135deg, #dceaff, #eef4ff);
+    color: #3a5088;
+}
+
+.dock-pill[data-asset="sol"].is-active {
+    border-color: #a888ff;
+    background: linear-gradient(135deg, #ece4ff, #f5eeff);
+    color: #5040a0;
+}
+
+.dock-pill[data-asset="us"].is-active {
+    border-color: #5ecfb8;
+    background: linear-gradient(135deg, #d8faf4, #e8fff8);
+    color: #2a6860;
+}
+
+.asset-side-panel.asset-side-highlight {
+    border-color: #9ec0ff;
+    box-shadow: 0 0 0 2px rgba(158, 192, 255, 0.35), 0 4px 18px rgba(120, 160, 220, 0.12);
+}
+
+/* =============================================================================
+   全屏宽资讯区（自适应 · 不叠字）
+   ============================================================================= */
+.asset-news-stage {
+    width: 100vw;
+    max-width: 100vw;
+    margin-left: calc(50% - 50vw);
+    margin-right: calc(50% - 50vw);
+    padding: 0 calc(0.75rem + 82px) 1.25rem 0.75rem;
+    box-sizing: border-box;
+}
+
+.panel-asset-news {
+    width: 100%;
+    max-width: none;
+    margin-bottom: 0;
+}
+
+.table-wrap-fluid {
+    overflow-x: auto;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.news-table-fluid {
+    table-layout: auto;
+    width: 100%;
+    min-width: 720px;
+}
+
+.news-table-fluid th,
+.news-table-fluid td {
+    padding: 16px 14px;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    vertical-align: top;
+    line-height: 1.65;
+    height: auto;
+    max-height: none;
+}
+
+.news-table-fluid .col-idx,
+.news-table-fluid .th-idx {
+    width: 2.5rem;
+    min-width: 2.5rem;
+    text-align: center;
+}
+
+.news-table-fluid .title-cell {
+    min-width: 14rem;
+    font-weight: 700;
+    color: #3d5568;
+}
+
+.news-table-fluid .summary-cell {
+    min-width: 18rem;
+    color: #5a6a7a;
+}
+
+.news-table-fluid .keywords-cell {
+    min-width: 8rem;
+}
+
+.news-table-fluid .time-cell,
+.news-table-fluid .th-time {
+    min-width: 9rem;
+    font-variant-numeric: tabular-nums;
+    color: #6a8ab8;
+    font-weight: 700;
+    font-size: 0.78rem;
+    white-space: nowrap;
+}
+
+.news-table-fluid .meta-cell,
+.news-table-fluid .th-meta {
+    min-width: 10rem;
+}
+
+.meta-stack-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.45rem 0.75rem;
+}
+
+.tag-btc {
+    background: linear-gradient(135deg, #fff8e8, #ffecc8);
+    color: #a07820;
+    border: 1px solid #f0d890;
+}
+
+.orbit-grid-compact {
+    margin-top: 0.5rem;
+}
+
+/* =============================================================================
+   晴雨表 + 分数历史走势图
+   ============================================================================= */
+.hub-dashboard-row {
+    display: grid;
+    grid-template-columns: minmax(260px, 400px) minmax(320px, 1fr);
+    gap: 1rem;
+    align-items: stretch;
+    margin-bottom: 1rem;
+}
+
+.hub-stage-compact {
+    margin-bottom: 0;
+}
+
+.score-chart-panel {
+    display: flex;
+    flex-direction: column;
+    min-height: 280px;
+    min-width: 0;
+    background: linear-gradient(
+        145deg,
+        rgba(255, 255, 255, 0.62) 0%,
+        rgba(248, 252, 255, 0.48) 50%,
+        rgba(245, 240, 255, 0.52) 100%
+    );
+    backdrop-filter: blur(20px) saturate(1.15);
+    -webkit-backdrop-filter: blur(20px) saturate(1.15);
+    border: 1px solid rgba(255, 255, 255, 0.92);
+    box-shadow:
+        0 8px 32px rgba(140, 180, 230, 0.08),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+}
+
+.score-chart-head {
+    margin-bottom: 0.5rem;
+}
+
+.score-chart-title {
+    font-size: 0.95rem;
+    margin-bottom: 0.25rem;
+    color: #6a8ab8;
+}
+
+.score-chart-body {
+    flex: 1;
+    min-height: 240px;
+    width: 100%;
+}
+
+.score-chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: 240px;
+    border-radius: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.75);
+    padding: 0.5rem 0.4rem 0.4rem;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.28);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.score-chart-glass-bg {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background:
+        radial-gradient(ellipse 70% 55% at 20% 15%, rgba(200, 230, 255, 0.35), transparent 60%),
+        radial-gradient(ellipse 60% 50% at 85% 80%, rgba(255, 220, 240, 0.22), transparent 55%),
+        radial-gradient(ellipse 50% 40% at 50% 100%, rgba(200, 255, 240, 0.15), transparent 50%);
+    opacity: 0.9;
+}
+
+.chart-legend {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem 0.55rem;
+    justify-content: center;
+    padding: 0 0.25rem 0.4rem;
+}
+
+.chart-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.28rem;
+    font-size: 0.6rem;
+    font-weight: 700;
+    color: #9aafc8;
+    white-space: nowrap;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--ff-pill);
+    background: rgba(255, 255, 255, 0.45);
+}
+
+.chart-legend-item i {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    border-radius: 999px;
+    flex-shrink: 0;
+    box-shadow: 0 0 6px rgba(180, 200, 240, 0.35);
+}
+
+.score-chart-svg {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: auto;
+    display: block;
+    overflow: visible;
+}
+
+.chart-zone-band {
+    pointer-events: none;
+}
+
+.chart-grid {
+    stroke: rgba(200, 218, 240, 0.35);
+    stroke-width: 1;
+    stroke-dasharray: 3 6;
+}
+
+.chart-axis-y,
+.chart-axis-x {
+    font-family: "Nunito", sans-serif;
+    font-size: 9px;
+    fill: #a8bcd4;
+    font-weight: 700;
+}
+
+.chart-area {
+    pointer-events: none;
+}
+
+.chart-line-glow,
+.chart-line-main {
+    pointer-events: none;
+    vector-effect: non-scaling-stroke;
+}
+
+.chart-dot-group {
+    opacity: 0.72;
+    transition: opacity 0.2s ease;
+}
+
+.chart-dot-group.is-active,
+.chart-dot-group:hover {
+    opacity: 1;
+}
+
+.chart-dot-halo {
+    pointer-events: none;
+    transition: r 0.2s ease, opacity 0.2s ease;
+}
+
+.chart-dot-group.is-active .chart-dot-halo,
+.chart-dot-group:hover .chart-dot-halo {
+    r: 14;
+    opacity: 0.65;
+}
+
+.chart-dot {
+    cursor: pointer;
+    transition: r 0.2s ease, stroke-width 0.2s ease;
+}
+
+.chart-dot:hover,
+.chart-dot:focus {
+    r: 5.5;
+    stroke-width: 2.5;
+    outline: none;
+}
+
+.score-chart-tooltip {
+    position: absolute;
+    z-index: 12;
+    pointer-events: none;
+    padding: 0.5rem 0.75rem;
+    border-radius: 14px;
+    background: rgba(255, 255, 255, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    box-shadow: 0 8px 24px rgba(140, 180, 230, 0.15);
+    font-size: 0.74rem;
+    color: #7a92b0;
+    line-height: 1.5;
+    white-space: nowrap;
+}
+
+.score-chart-tooltip strong {
+    font-size: 1.05rem;
+    font-weight: 800;
+}
+
+.chart-tip-bullStrong strong { color: #4aaf78; }
+.chart-tip-bull strong { color: #4a9a92; }
+.chart-tip-neutral strong { color: #8a82b8; }
+.chart-tip-bear strong { color: #c89878; }
+.chart-tip-bearStrong strong { color: #c87878; }
+
+.score-chart-empty {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 200px;
+    color: var(--ff-muted);
+    font-size: 0.82rem;
+    text-align: center;
+    padding: 1.25rem;
+    line-height: 1.65;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.35);
+    backdrop-filter: blur(14px);
+    border: 1px solid rgba(255, 255, 255, 0.75);
 }
 
 /* =============================================================================
@@ -633,6 +1118,7 @@ body.firefly-ui {
 .ticker-chip {
     display: inline-flex;
     align-items: center;
+    flex-wrap: wrap;
     gap: 0.45rem;
     flex-shrink: 0;
     max-width: 420px;
@@ -776,14 +1262,15 @@ body.firefly-ui {
     width: 100%;
     border-collapse: collapse;
     font-size: 0.84rem;
-    table-layout: fixed;
+    table-layout: auto;
 }
 
+/* 旧固定列宽表格（计分等非资讯区仍可用） */
 .news-table-fixed .col-idx { width: 3%; }
-.news-table-fixed .col-title { width: 40%; }
-.news-table-fixed .col-summary { width: 35%; }
-.news-table-fixed .col-kw { width: 12%; }
-.news-table-fixed .col-meta { width: 13%; }
+.news-table-fixed .col-title { width: 36%; }
+.news-table-fixed .col-summary { width: 32%; }
+.news-table-fixed .col-kw { width: 11%; }
+.news-table-fixed .col-meta { width: 18%; }
 
 .data-table th,
 .data-table td {
@@ -827,7 +1314,23 @@ body.firefly-ui {
 
 .meta-stack { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.78rem; }
 .meta-source { color: var(--ff-muted); word-break: break-all; }
+.meta-time {
+    color: #6a8ab8;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-size: 0.72rem;
+}
 .meta-link { font-size: 0.75rem; }
+
+.ticker-chip-time {
+    font-size: 0.62rem;
+    font-weight: 700;
+    color: #8a9ec8;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
 
 .news-row-clickable { cursor: pointer; }
 .news-row-clickable:hover { background: #f8fbff !important; }
@@ -994,13 +1497,43 @@ code {
 
 .muted { color: var(--ff-muted); font-size: 0.78rem; }
 
+@media (max-width: 900px) {
+    .hub-dashboard-row {
+        grid-template-columns: 1fr;
+    }
+    .hub-stage-compact {
+        margin-bottom: 0.5rem;
+    }
+}
+
 @media (max-width: 720px) {
+    .main-content {
+        padding: 0 calc(0.5rem + 76px) 2rem 0.5rem;
+    }
+    .asset-switcher-dock {
+        right: 6px;
+        top: 50%;
+        bottom: auto;
+        transform: translateY(-50%);
+        min-width: 62px;
+        padding: 0.65rem 0.45rem;
+        border-radius: var(--ff-r-lg);
+    }
+    .dock-pill {
+        font-size: 0.8rem;
+        padding: 0.55rem 0.6rem;
+    }
+    .asset-switcher { flex-direction: column; padding: 0.75rem; }
+    .asset-switcher-pills { width: 100%; }
+    .asset-pill { flex: 1 1 calc(50% - 0.45rem); min-width: 0; text-align: center; }
+    .asset-news-stage { padding: 0 calc(0.5rem + 76px) 1rem 0.5rem; }
+    .news-table-fluid { min-width: 600px; font-size: 0.8rem; }
+    .news-table-fluid th,
+    .news-table-fluid td { padding: 12px 10px; }
     .price-hero-strip { grid-template-columns: 1fr; }
     .weight-score-strip { grid-template-columns: repeat(2, 1fr); }
     .orbit-grid { grid-template-columns: 1fr; }
     .panel-a, .panel-full { grid-column: span 1; }
     :root { --gauge-size: min(92vw, 340px); }
     .ring-state { font-size: 0.62rem; }
-    .news-table-fixed .col-title { width: 36%; }
-    .news-table-fixed .col-summary { width: 38%; }
 }

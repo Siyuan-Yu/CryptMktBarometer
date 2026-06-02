@@ -20,6 +20,7 @@ class DashboardState:
     categories: list[dict[str, Any]] = field(default_factory=list)
     total_score: float | None = None
     top_news: list[dict[str, Any]] = field(default_factory=list)
+    btc_news: list[dict[str, Any]] = field(default_factory=list)
     sol_news: list[dict[str, Any]] = field(default_factory=list)
     eth_news: list[dict[str, Any]] = field(default_factory=list)
     macro_news: list[dict[str, Any]] = field(default_factory=list)
@@ -45,6 +46,7 @@ def update_state(
     categories: list[dict[str, Any]] | None = None,
     total_score: float | None = None,
     top_news: list[dict[str, Any]] | None = None,
+    btc_news: list[dict[str, Any]] | None = None,
     sol_news: list[dict[str, Any]] | None = None,
     eth_news: list[dict[str, Any]] | None = None,
     macro_news: list[dict[str, Any]] | None = None,
@@ -63,6 +65,8 @@ def update_state(
             _state.total_score = total_score
         if top_news is not None:
             _state.top_news = top_news
+        if btc_news is not None:
+            _state.btc_news = btc_news
         if sol_news is not None:
             _state.sol_news = sol_news
         if eth_news is not None:

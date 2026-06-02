@@ -76,9 +76,10 @@ def run_data_fetch() -> FetchResult:
             crypto_news,
             macro_news_items,
             top_limit=10,
-            category_limit=10,
+            category_limit=20,
         )
         top_news = news_views["top"]
+        btc_news = news_views["btc"]
         sol_news = news_views["sol"]
         eth_news = news_views["eth"]
         macro_news = news_views["macro"]
@@ -180,6 +181,7 @@ def run_data_fetch() -> FetchResult:
             categories=score_result.categories,
             total_score=score_result.total_score,
             top_news=top_news,
+            btc_news=btc_news,
             sol_news=sol_news,
             eth_news=eth_news,
             macro_news=macro_news,
