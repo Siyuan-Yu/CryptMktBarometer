@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- 板块 A：大盘晴雨计分总表 -->
+<section class="panel panel-a" id="panel-score">
+    <h2 class="panel-title">板块 A · 大盘晴雨计分总表</h2>
+    <div class="table-wrap">
+        <table class="data-table score-table">
+            <thead>
+                <tr>
+                    <th>大类名称</th>
+                    <th>权重占比</th>
+                    <th>当前分项得分</th>
+                    <th>分项简要说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in categories %}
+                <tr>
+                    <td>{{ cat.name }}</td>
+                    <td>{{ cat.weight }}%</td>
+                    <td class="score-cell">
+                        {% if cat.score is not none %}{{ cat.score | round(1) }}{% else %}—{% endif %}
+                    </td>
+                    <td class="summary-cell">{{ cat.summary }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr class="total-row">
+                    <td colspan="2"><strong>综合总分</strong></td>
+                    <td class="total-score-cell">
+                        {% if total_score is not none %}
+                            <strong>{{ total_score | round(1) }}</strong> / 100
+                        {% else %}
+                            <strong>—</strong>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <span class="rating-tag {{ rating_class }}">当前市场评级：{{ rating_label }}</span>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    <p class="panel-hint">评级规则：&gt;70 强利多 · 55~70 偏利多 · 45~55 中性 · 30~45 偏利空 · &lt;30 强利空</p>
+</section>
+
+<!-- 板块 B：TOP10 重磅资讯 -->
+<section class="panel panel-b" id="panel-news">
+    <h2 class="panel-title">板块 B · TOP10 重磅资讯</h2>
+    <div class="table-wrap">
+        <table class="data-table news-table">
+            <thead>
+                <tr>
+                    <th>序号</th>
+                    <th>消息标题</th>
+                    <th>来源名称</th>
+                    <th>源链接</th>
+                    <th>影响分值</th>
+                    <th>核心关键词</th>
+                    <th>影响盘面逻辑说明</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if top_news %}
+                    {% for item in top_news %}
+                    <tr>
+                        <td>{{ loop.index }}</td>
+                        <td class="title-cell">{{ item.title }}</td>
+                        <td>{{ item.source }}</td>
+                        <td>
+                            {% if item.url %}
+                            <a href="{{ item.url }}" target="_blank" rel="noopener">查看</a>
+                            {% else %}—{% endif %}
+                        </td>
+                        <td class="impact-cell {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
+                            {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}
+                        </td>
+                        <td class="keywords-cell">{{ item.keywords | join(' · ') if item.keywords else '—' }}</td>
+                        <td class="logic-cell">{{ item.logic or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" class="empty-row">暂无资讯数据，第三步对接数据源后自动填充并按影响分值排序 TOP10</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 板块 C：原始数据日志 -->
+<section class="panel panel-c" id="panel-log">
+    <h2 class="panel-title">板块 C · 原始数据日志</h2>
+    <div class="log-box">
+        <dl class="log-dl">
+            <dt>本轮抓取时间</dt>
+            <dd>{{ fetch_log.fetch_time }}</dd>
+            <dt>数据源汇总</dt>
+            <dd>{{ fetch_log.sources_summary }}</dd>
+            <dt>异常报错</dt>
+            <dd>
+                {% if fetch_log.errors %}
+                    <ul class="error-list">
+                        {% for err in fetch_log.errors %}
+                        <li>{{ err }}</li>
+                        {% endfor %}
+                    </ul>
+                {% else %}
+                    <span class="no-error">无</span>
+                {% endif %}
+            </dd>
+        </dl>
+    </div>
+</section>
+{% endblock %}

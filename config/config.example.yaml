@@ -1,0 +1,47 @@
+# =============================================================================
+# 配置文件模板 — 复制为 config/config.yaml 后按需修改
+# 注意：config.yaml 已加入 .gitignore，请勿将密钥提交到版本库
+# =============================================================================
+
+# Flask Web 服务
+web:
+  host: "127.0.0.1"          # 本机访问；第六步可改为 0.0.0.0 以支持局域网
+  port: 5000
+  debug: false
+
+# 定时轮询（第二步启用）
+scheduler:
+  enabled: false             # 第一步先关闭，第二步改为 true
+  interval_minutes: 10       # 轮询间隔（分钟），可自定义
+
+# 数据存储
+storage:
+  log_dir: "data/logs"       # CSV 历史日志目录
+
+# ---------------------------------------------------------------------------
+# API 密钥（第三步起逐步使用，暂无密钥可留空）
+# ---------------------------------------------------------------------------
+api_keys:
+  fred: ""                   # FRED 宏观数据 https://fred.stlouisfed.org/docs/api/api_key.html
+  cryptopanic: ""            # CryptoPanic 资讯
+  coinglass: ""              # CoinGlass 资金数据
+  dune: ""                   # Dune Analytics
+
+# 数据源开关（第三步对接时启用）
+data_sources:
+  macro:
+    cme_fedwatch: true
+    treasury_10y: true
+    fred_calendar: true
+  news:
+    cryptopanic: true
+    coindesk: true
+    theblock: true
+  funding:
+    coinglass_etf: true
+    coinglass_liquidation: true
+    coinglass_oi: true
+  onchain:
+    solana_official: true
+    eth_staking: true
+    dune_dashboard: true

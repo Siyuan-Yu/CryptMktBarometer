@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}{{ page_title | default('加密货币行情晴雨分析系统') }}{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <header class="site-header">
+        <div class="header-inner">
+            <h1 class="site-title">{{ page_title | default('加密货币行情晴雨分析系统') }}</h1>
+            <p class="site-subtitle">本地常驻 · 多源聚合 · 晴雨计分</p>
+        </div>
+        <div class="header-meta">
+            <span class="meta-badge {% if scheduler_enabled %}badge-on{% else %}badge-off{% endif %}">
+                定时任务：{% if scheduler_enabled %}已启用{% else %}未启用（第二步）{% endif %}
+            </span>
+            <span class="meta-badge">轮询间隔：{{ poll_interval }} 分钟</span>
+            <span class="meta-badge">访问：http://{{ web_host }}:{{ web_port }}</span>
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="site-footer">
+        <p>第一步：项目骨架与页面布局 · 数据与计分功能将陆续接入</p>
+    </footer>
+</body>
+</html>

@@ -1,0 +1,241 @@
+/* 加密货币行情晴雨分析系统 - 全局样式（简洁清爽） */
+
+:root {
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --text: #1a2332;
+    --text-muted: #5c6b7f;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --bull-strong: #059669;
+    --bull: #10b981;
+    --neutral: #6b7280;
+    --bear: #f59e0b;
+    --bear-strong: #dc2626;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+}
+
+/* 页头 */
+.site-header {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
+    color: #fff;
+    padding: 1.25rem 1.5rem 1rem;
+    box-shadow: var(--shadow);
+}
+
+.header-inner {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.site-title {
+    font-size: 1.35rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+.site-subtitle {
+    font-size: 0.85rem;
+    opacity: 0.85;
+    margin-top: 0.25rem;
+}
+
+.header-meta {
+    max-width: 1200px;
+    margin: 0.75rem auto 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.meta-badge {
+    font-size: 0.75rem;
+    background: rgba(255, 255, 255, 0.15);
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+}
+
+.badge-on { background: rgba(16, 185, 129, 0.35); }
+.badge-off { background: rgba(255, 255, 255, 0.12); }
+
+/* 主内容 */
+.main-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 1.25rem 1rem 2rem;
+}
+
+.panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1rem 1.25rem 1.25rem;
+    margin-bottom: 1.25rem;
+    box-shadow: var(--shadow);
+}
+
+.panel-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--border);
+}
+
+.panel-hint {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 0.75rem;
+}
+
+/* 表格 */
+.table-wrap {
+    overflow-x: auto;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+}
+
+.data-table th,
+.data-table td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.65rem;
+    text-align: left;
+    vertical-align: top;
+}
+
+.data-table th {
+    background: #f8fafc;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.data-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+.score-cell {
+    text-align: center;
+    font-weight: 600;
+    min-width: 4rem;
+}
+
+.summary-cell {
+    color: var(--text-muted);
+    max-width: 280px;
+}
+
+.total-row {
+    background: #eff6ff !important;
+}
+
+.total-row td {
+    border-top: 2px solid var(--accent);
+}
+
+.total-score-cell {
+    text-align: center;
+    font-size: 1rem;
+    color: var(--accent);
+}
+
+/* 评级标签 */
+.rating-tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.85rem;
+}
+
+.rating-bull-strong { background: #d1fae5; color: var(--bull-strong); }
+.rating-bull { background: #ecfdf5; color: var(--bull); }
+.rating-neutral { background: #f3f4f6; color: var(--neutral); }
+.rating-bear { background: #fef3c7; color: var(--bear); }
+.rating-bear-strong { background: #fee2e2; color: var(--bear-strong); }
+
+/* 资讯表 */
+.title-cell { max-width: 200px; }
+.keywords-cell { max-width: 120px; font-size: 0.8rem; }
+.logic-cell { max-width: 220px; color: var(--text-muted); font-size: 0.82rem; }
+
+.impact-pos { color: var(--bull-strong); font-weight: 600; }
+.impact-neg { color: var(--bear-strong); font-weight: 600; }
+
+.empty-row {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 1.5rem !important;
+}
+
+a {
+    color: var(--accent);
+    text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+/* 日志区 */
+.log-box {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+}
+
+.log-dl dt {
+    font-weight: 600;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-top: 0.5rem;
+}
+
+.log-dl dt:first-child { margin-top: 0; }
+
+.log-dl dd {
+    margin-left: 0;
+    margin-top: 0.15rem;
+    font-size: 0.875rem;
+}
+
+.no-error { color: var(--bull); }
+
+.error-list {
+    margin: 0;
+    padding-left: 1.2rem;
+    color: var(--bear-strong);
+}
+
+/* 页脚 */
+.site-footer {
+    text-align: center;
+    padding: 1rem;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+}
+
+/* 手机端适配（第六步局域网访问时有用） */
+@media (max-width: 640px) {
+    .site-title { font-size: 1.1rem; }
+    .panel { padding: 0.75rem; }
+    .data-table { font-size: 0.8rem; }
+}
