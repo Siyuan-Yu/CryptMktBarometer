@@ -1,18 +1,30 @@
-/* 加密货币行情晴雨分析系统 - 全局样式（简洁清爽） */
+/* =============================================================================
+   加密货币行情晴雨表 — 萤火虫车机风（治愈 · 圆润 · 浅色）
+   仅视觉层，不改变布局与功能
+   ============================================================================= */
 
 :root {
-    --bg: #f4f6f9;
-    --card: #ffffff;
-    --text: #1a2332;
-    --text-muted: #5c6b7f;
-    --border: #e2e8f0;
-    --accent: #2563eb;
-    --bull-strong: #059669;
-    --bull: #10b981;
-    --neutral: #6b7280;
-    --bear: #f59e0b;
-    --bear-strong: #dc2626;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    --bg: linear-gradient(165deg, #f7f9fc 0%, #eef4ff 38%, #fdf6fb 100%);
+    --bg-solid: #f4f7fc;
+    --card: rgba(255, 255, 255, 0.82);
+    --card-solid: #ffffff;
+    --text: #3d4a5c;
+    --text-muted: #8b9bb0;
+    --border: rgba(180, 200, 230, 0.35);
+    --accent: #6eb5ff;
+    --accent-deep: #5a9de8;
+    --bull-strong: #4ecf9a;
+    --bull: #6dd4b8;
+    --neutral: #a8b4c8;
+    --bear: #ffb87a;
+    --bear-strong: #ff9b9b;
+    --shadow-soft: 0 8px 32px rgba(120, 160, 220, 0.12);
+    --shadow-card: 0 4px 24px rgba(140, 170, 210, 0.1);
+    --radius-sm: 12px;
+    --radius-md: 18px;
+    --radius-lg: 24px;
+    --radius-pill: 999px;
+    --font: "Nunito", "HarmonyOS Sans SC", "PingFang SC", "Microsoft YaHei UI", sans-serif;
 }
 
 * {
@@ -22,19 +34,23 @@
 }
 
 body {
-    font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
-    background: var(--bg);
+    font-family: var(--font);
+    background: var(--bg-solid);
+    background-image: var(--bg);
+    background-attachment: fixed;
     color: var(--text);
-    line-height: 1.5;
+    line-height: 1.55;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
 }
 
-/* 页头 */
+/* 页头 — 柔和渐变胶囊感 */
 .site-header {
-    background: linear-gradient(135deg, #1e3a5f 0%, #2563eb 100%);
-    color: #fff;
-    padding: 1.25rem 1.5rem 1rem;
-    box-shadow: var(--shadow);
+    background: linear-gradient(135deg, #dceeff 0%, #e8e4ff 45%, #ffe8f4 100%);
+    color: var(--text);
+    padding: 1.5rem 1.5rem 1.1rem;
+    box-shadow: var(--shadow-soft);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.6);
 }
 
 .header-inner {
@@ -43,73 +59,116 @@ body {
 }
 
 .site-title {
-    font-size: 1.35rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: #4a6a8a;
 }
 
 .site-subtitle {
-    font-size: 0.85rem;
-    opacity: 0.85;
-    margin-top: 0.25rem;
+    font-size: 0.88rem;
+    color: var(--text-muted);
+    margin-top: 0.35rem;
+    font-weight: 500;
 }
 
 .header-meta {
     max-width: 1200px;
-    margin: 0.75rem auto 0;
+    margin: 0.9rem auto 0;
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
 }
 
 .meta-badge {
-    font-size: 0.75rem;
-    background: rgba(255, 255, 255, 0.15);
-    padding: 0.2rem 0.6rem;
-    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.65);
+    color: var(--text-muted);
+    padding: 0.35rem 0.75rem;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 8px rgba(160, 190, 230, 0.08);
+    backdrop-filter: blur(8px);
 }
 
-.badge-on { background: rgba(16, 185, 129, 0.35); }
-.badge-off { background: rgba(255, 255, 255, 0.12); }
+.badge-on {
+    background: linear-gradient(135deg, #d4fce8, #e8fff5);
+    color: #3d8f6e;
+}
+.badge-off {
+    background: rgba(255, 255, 255, 0.5);
+}
 
-/* 实时价格条 */
+/* 实时价格 — 椭圆大卡片 */
 .price-strip {
     max-width: 1200px;
-    margin: 1rem auto 0;
+    margin: 1.25rem auto 0;
     padding: 0 1rem;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0.75rem;
+    gap: 1rem;
     align-items: stretch;
 }
 
 .price-card {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 1rem 1.25rem;
-    box-shadow: var(--shadow);
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.95), rgba(240, 248, 255, 0.85));
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: 50% / 28%;
+    border-radius: 28px 28px 32px 32px;
+    padding: 1.35rem 1.5rem 1.2rem;
+    box-shadow: var(--shadow-card);
     text-align: center;
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.price-card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(180, 220, 255, 0.25), transparent 70%);
+    pointer-events: none;
+}
+
+.price-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 36px rgba(120, 170, 230, 0.18);
+}
+
+#price-btc {
+    background: linear-gradient(145deg, #fffefb, #fff5e8);
+}
+#price-eth {
+    background: linear-gradient(145deg, #f8fcff, #eef6ff);
+}
+#price-sol {
+    background: linear-gradient(145deg, #f9f8ff, #f0eeff);
 }
 
 .price-label {
-    font-size: 0.85rem;
-    font-weight: 600;
+    font-size: 0.8rem;
+    font-weight: 700;
     color: var(--text-muted);
-    letter-spacing: 0.08em;
+    letter-spacing: 0.12em;
+    position: relative;
 }
 
 .price-value {
-    font-size: 1.65rem;
-    font-weight: 700;
-    color: var(--text);
-    margin: 0.35rem 0;
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: #4a6a8a;
+    margin: 0.4rem 0 0.2rem;
     font-variant-numeric: tabular-nums;
+    position: relative;
 }
 
 .price-change {
-    font-size: 0.9rem;
-    font-weight: 600;
+    font-size: 0.88rem;
+    font-weight: 700;
+    position: relative;
 }
 
 .price-change.chg-up { color: var(--bull-strong); }
@@ -124,79 +183,124 @@ body {
     justify-content: center;
     gap: 1.5rem;
     flex-wrap: wrap;
+    padding: 0.25rem 0;
 }
 
 /* 主内容 */
 .main-content {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 1.25rem 1rem 2rem;
+    padding: 1.5rem 1rem 2.5rem;
 }
 
 .panel {
     background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 1rem 1.25rem 1.25rem;
-    margin-bottom: 1.25rem;
-    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.85);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.35rem 1.4rem;
+    margin-bottom: 1.35rem;
+    box-shadow: var(--shadow-card);
+    transition: box-shadow 0.25s ease;
+}
+
+.panel:hover {
+    box-shadow: var(--shadow-soft);
 }
 
 .panel-title {
-    font-size: 1rem;
-    font-weight: 600;
-    color: var(--accent);
-    margin-bottom: 0.75rem;
-    padding-bottom: 0.5rem;
-    border-bottom: 2px solid var(--border);
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #6a8fb8;
+    margin-bottom: 0.85rem;
+    padding-bottom: 0.55rem;
+    border-bottom: none;
+    position: relative;
+}
+
+.panel-title::after {
+    content: "";
+    display: block;
+    width: 48px;
+    height: 4px;
+    margin-top: 0.45rem;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, #a8d4ff, #d4b8ff, #ffb8d4);
 }
 
 .panel-hint {
-    font-size: 0.78rem;
+    font-size: 0.8rem;
     color: var(--text-muted);
     margin-top: 0.75rem;
+    line-height: 1.6;
 }
 
 .status-banner {
-    background: #eff6ff;
-    border-left: 3px solid var(--accent);
-    padding: 0.4rem 0.65rem;
-    border-radius: 4px;
+    background: linear-gradient(135deg, #eef6ff, #f5f0ff);
+    border: none;
+    border-left: none;
+    padding: 0.65rem 0.9rem;
+    border-radius: var(--radius-md);
+    box-shadow: inset 0 0 0 1px rgba(180, 210, 255, 0.3);
 }
 
-/* 表格 */
+/* 表格 — 圆润柔和 */
 .table-wrap {
     overflow-x: auto;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.5);
+    padding: 0.25rem;
 }
 
 .data-table {
     width: 100%;
-    border-collapse: collapse;
+    border-collapse: separate;
+    border-spacing: 0;
     font-size: 0.875rem;
+    overflow: hidden;
+    border-radius: var(--radius-md);
 }
 
 .data-table th,
 .data-table td {
-    border: 1px solid var(--border);
-    padding: 0.5rem 0.65rem;
+    border: none;
+    border-bottom: 1px solid rgba(220, 230, 245, 0.6);
+    padding: 0.65rem 0.75rem;
     text-align: left;
     vertical-align: top;
 }
 
 .data-table th {
-    background: #f8fafc;
-    font-weight: 600;
+    background: linear-gradient(180deg, #f0f6ff, #f8f4ff);
+    font-weight: 700;
+    color: #7a94b0;
     white-space: nowrap;
 }
 
+.data-table th:first-child { border-radius: var(--radius-sm) 0 0 0; }
+.data-table th:last-child { border-radius: 0 var(--radius-sm) 0 0; }
+
+.data-table tbody tr {
+    transition: background 0.15s ease;
+}
+
 .data-table tbody tr:nth-child(even) {
-    background: #fafbfc;
+    background: rgba(248, 252, 255, 0.7);
+}
+
+.data-table tbody tr:hover {
+    background: rgba(232, 244, 255, 0.85);
+}
+
+.data-table tbody tr:last-child td {
+    border-bottom: none;
 }
 
 .score-cell {
     text-align: center;
-    font-weight: 600;
+    font-weight: 700;
     min-width: 4rem;
+    color: #5a9de8;
 }
 
 .summary-cell {
@@ -205,125 +309,159 @@ body {
 }
 
 .total-row {
-    background: #eff6ff !important;
+    background: linear-gradient(90deg, #eef6ff, #f8f0ff) !important;
 }
 
 .total-row td {
-    border-top: 2px solid var(--accent);
+    border-top: none;
+    border-bottom: none;
+    font-weight: 600;
 }
 
 .total-score-cell {
     text-align: center;
-    font-size: 1rem;
-    color: var(--accent);
+    font-size: 1.1rem;
+    color: var(--accent-deep);
+    font-weight: 800;
 }
 
-/* 评级标签 */
+/* 评级标签 — 胶囊渐变 */
 .rating-tag {
     display: inline-block;
-    padding: 0.2rem 0.6rem;
-    border-radius: 4px;
-    font-weight: 600;
-    font-size: 0.85rem;
+    padding: 0.35rem 0.85rem;
+    border-radius: var(--radius-pill);
+    font-weight: 700;
+    font-size: 0.88rem;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
 }
 
-.rating-bull-strong { background: #d1fae5; color: var(--bull-strong); }
-.rating-bull { background: #ecfdf5; color: var(--bull); }
-.rating-neutral { background: #f3f4f6; color: var(--neutral); }
-.rating-bear { background: #fef3c7; color: var(--bear); }
-.rating-bear-strong { background: #fee2e2; color: var(--bear-strong); }
+.rating-bull-strong {
+    background: linear-gradient(135deg, #d4fce8, #b8f5dc);
+    color: #2d8f62;
+}
+.rating-bull {
+    background: linear-gradient(135deg, #e0faf5, #c8f0e8);
+    color: #3d9a7a;
+}
+.rating-neutral {
+    background: linear-gradient(135deg, #f0eef8, #e8e4f5);
+    color: #7a7a9a;
+}
+.rating-bear {
+    background: linear-gradient(135deg, #fff4e6, #ffe8cc);
+    color: #c98a3d;
+}
+.rating-bear-strong {
+    background: linear-gradient(135deg, #ffe8e8, #ffd4d4);
+    color: #d66a6a;
+}
 
-/* 资讯表 */
 .title-cell { max-width: 200px; }
 .keywords-cell { max-width: 120px; font-size: 0.8rem; }
 .logic-cell { max-width: 220px; color: var(--text-muted); font-size: 0.82rem; }
 
-.impact-pos { color: var(--bull-strong); font-weight: 600; }
-.impact-neg { color: var(--bear-strong); font-weight: 600; }
+.impact-pos { color: var(--bull-strong); font-weight: 700; }
+.impact-neg { color: var(--bear-strong); font-weight: 700; }
 .impact-neutral { color: var(--neutral); }
 
-.muted { color: var(--text-muted); font-size: 0.78rem; font-weight: 400; }
+.muted { color: var(--text-muted); font-size: 0.78rem; font-weight: 500; }
 
 .weight-bar-wrap {
-    background: #e2e8f0;
-    border-radius: 4px;
-    height: 8px;
-    margin-bottom: 0.25rem;
+    background: rgba(220, 232, 248, 0.6);
+    border-radius: var(--radius-pill);
+    height: 10px;
+    margin-bottom: 0.3rem;
     max-width: 140px;
+    overflow: hidden;
 }
 .weight-bar {
     height: 100%;
-    border-radius: 4px;
-    background: linear-gradient(90deg, #3b82f6, #2563eb);
-    transition: width 0.6s ease;
+    border-radius: var(--radius-pill);
+    background: linear-gradient(90deg, #a8d8ff, #c4b0ff);
+    transition: width 0.6s cubic-bezier(0.34, 1.2, 0.64, 1);
 }
 .boost-tag {
-    font-size: 0.7rem;
-    background: #fef3c7;
-    color: #b45309;
-    padding: 0.1rem 0.35rem;
-    border-radius: 3px;
-    margin-left: 0.25rem;
+    font-size: 0.68rem;
+    background: linear-gradient(135deg, #fff8e8, #ffeccc);
+    color: #c99040;
+    padding: 0.15rem 0.45rem;
+    border-radius: var(--radius-pill);
+    margin-left: 0.3rem;
+    font-weight: 600;
 }
 
 .btn-primary {
-    background: var(--accent);
+    background: linear-gradient(135deg, #8ec8ff 0%, #b8a8ff 50%, #ffb8d8 100%);
     color: #fff;
     border: none;
-    padding: 0.5rem 1rem;
-    border-radius: 6px;
-    font-size: 0.875rem;
+    padding: 0.6rem 1.25rem;
+    border-radius: var(--radius-pill);
+    font-size: 0.9rem;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
+    box-shadow: 0 4px 16px rgba(140, 180, 240, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.btn-primary:hover { background: #1d4ed8; }
-.btn-primary:disabled { opacity: 0.6; cursor: wait; }
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(140, 180, 240, 0.4);
+}
+.btn-primary:disabled {
+    opacity: 0.55;
+    cursor: wait;
+    transform: none;
+}
 
 .backtest-actions {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 0.75rem;
-    margin-bottom: 0.75rem;
+    gap: 0.85rem;
+    margin-bottom: 0.85rem;
 }
 
 .empty-row {
     text-align: center;
     color: var(--text-muted);
-    padding: 1.5rem !important;
+    padding: 1.75rem !important;
 }
 
 a {
-    color: var(--accent);
+    color: var(--accent-deep);
     text-decoration: none;
+    font-weight: 600;
+    transition: color 0.15s ease;
 }
 
-a:hover { text-decoration: underline; }
+a:hover {
+    color: #8b7aff;
+    text-decoration: underline;
+}
 
 /* 日志区 */
 .log-box {
-    background: #f8fafc;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.9), rgba(248, 252, 255, 0.8));
+    border: 1px solid rgba(230, 240, 255, 0.8);
+    border-radius: var(--radius-md);
+    padding: 0.9rem 1.1rem;
 }
 
 .log-dl dt {
-    font-weight: 600;
-    font-size: 0.8rem;
+    font-weight: 700;
+    font-size: 0.78rem;
     color: var(--text-muted);
-    margin-top: 0.5rem;
+    margin-top: 0.55rem;
 }
 
 .log-dl dt:first-child { margin-top: 0; }
 
 .log-dl dd {
     margin-left: 0;
-    margin-top: 0.15rem;
+    margin-top: 0.2rem;
     font-size: 0.875rem;
 }
 
-.no-error { color: var(--bull); }
+.no-error { color: var(--bull-strong); font-weight: 600; }
 
 .error-list {
     margin: 0;
@@ -331,42 +469,66 @@ a:hover { text-decoration: underline; }
     color: var(--bear-strong);
 }
 
-/* 页脚与使用说明 */
+/* 页脚 */
 .site-footer {
     max-width: 1200px;
     margin: 0 auto 2rem;
-    padding: 1.25rem 1rem;
+    padding: 1.35rem 1.15rem;
     font-size: 0.8rem;
     color: var(--text-muted);
-    border-top: 1px solid var(--border);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: var(--radius-lg);
     background: var(--card);
+    box-shadow: var(--shadow-card);
 }
 
 .usage-guide { text-align: left; }
 
 .guide-title {
-    font-size: 0.95rem;
-    color: var(--text);
+    font-size: 0.98rem;
+    color: #6a8fb8;
     margin-bottom: 0.75rem;
+    font-weight: 700;
 }
 
 .guide-list {
     margin: 0 0 0.75rem 1.25rem;
-    line-height: 1.7;
+    line-height: 1.75;
 }
 
-.guide-list li { margin-bottom: 0.35rem; }
+.guide-list li { margin-bottom: 0.4rem; }
 
 .guide-note {
     font-size: 0.75rem;
     color: var(--text-muted);
 }
 
-/* 手机端适配（第六步局域网访问时有用） */
+code {
+    background: rgba(232, 244, 255, 0.8);
+    padding: 0.1rem 0.35rem;
+    border-radius: 6px;
+    font-size: 0.85em;
+}
+
+/* 板块微调色（轻区分，保持可爱统一） */
+.panel-a { border-top: 3px solid rgba(168, 212, 255, 0.5); }
+.panel-b { border-top: 3px solid rgba(200, 184, 255, 0.45); }
+.panel-g { border-top: 3px solid rgba(255, 200, 220, 0.45); }
+.panel-h { border-top: 3px solid rgba(180, 220, 255, 0.5); }
+.panel-i { border-top: 3px solid rgba(255, 220, 180, 0.45); }
+.panel-c { border-top: 3px solid rgba(200, 230, 255, 0.4); }
+.panel-d { border-top: 3px solid rgba(184, 220, 255, 0.5); }
+.panel-e { border-top: 3px solid rgba(220, 200, 255, 0.45); }
+.panel-f { border-top: 3px solid rgba(255, 200, 200, 0.4); }
+
 @media (max-width: 640px) {
-    .site-title { font-size: 1.1rem; }
-    .panel { padding: 0.75rem; }
+    .site-title { font-size: 1.15rem; }
+    .panel {
+        padding: 1rem;
+        border-radius: var(--radius-md);
+    }
     .data-table { font-size: 0.8rem; }
     .price-strip { grid-template-columns: 1fr; }
-    .price-value { font-size: 1.35rem; }
+    .price-card { border-radius: var(--radius-lg); }
+    .price-value { font-size: 1.45rem; }
 }

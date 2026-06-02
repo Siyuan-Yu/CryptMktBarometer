@@ -1,0 +1,4 @@
+# Build Windows desktop exe (install on top of requirements.txt)
+pyinstaller>=6.0,<7.0
+pystray>=0.19,<1.0
+Pillow>=10.0,<12.0

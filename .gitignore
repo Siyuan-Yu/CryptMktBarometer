@@ -23,3 +23,8 @@ data/cache/
 # 系统
 .DS_Store
 Thumbs.db
+
+# PyInstaller
+build/
+dist/
+*.spec.bak

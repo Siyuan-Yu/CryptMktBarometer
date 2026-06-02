@@ -7,9 +7,12 @@
     {% if page_auto_refresh_seconds and page_auto_refresh_seconds > 0 %}
     <meta http-equiv="refresh" content="{{ page_auto_refresh_seconds }}">
     {% endif %}
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="firefly-ui">
     <header class="site-header">
         <div class="header-inner">
             <h1 class="site-title">{{ page_title | default('加密货币行情晴雨分析系统') }}</h1>
