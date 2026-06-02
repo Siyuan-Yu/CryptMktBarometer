@@ -83,7 +83,7 @@
                     {% endfor %}
                 {% else %}
                     <tr>
-                        <td colspan="7" class="empty-row">暂无资讯数据，第三步对接数据源后自动填充并按影响分值排序 TOP10</td>
+                        <td colspan="7" class="empty-row">暂无资讯数据；定时任务每轮拉取后，第三步对接数据源并按影响分值排序 TOP10</td>
                     </tr>
                 {% endif %}
             </tbody>
@@ -98,8 +98,30 @@
         <dl class="log-dl">
             <dt>本轮抓取时间</dt>
             <dd>{{ fetch_log.fetch_time }}</dd>
+            {% if fetch_log.started_at %}
+            <dt>开始时间</dt>
+            <dd>{{ fetch_log.started_at }}</dd>
+            {% endif %}
+            {% if fetch_log.duration_sec is defined %}
+            <dt>耗时（秒）</dt>
+            <dd>{{ fetch_log.duration_sec }}</dd>
+            {% endif %}
             <dt>数据源汇总</dt>
             <dd>{{ fetch_log.sources_summary }}</dd>
+            {% if fetch_log.total_score is defined and fetch_log.total_score is not none %}
+            <dt>本轮综合计分</dt>
+            <dd><strong>{{ fetch_log.total_score }}</strong> / 100 · {{ fetch_log.rating_label }}</dd>
+            {% endif %}
+            {% if fetch_log.macro_calendar %}
+            <dt>近期经济发布（FRED）</dt>
+            <dd>
+                <ul class="error-list" style="color: #5c6b7f;">
+                    {% for item in fetch_log.macro_calendar %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+            </dd>
+            {% endif %}
             <dt>异常报错</dt>
             <dd>
                 {% if fetch_log.errors %}
@@ -114,5 +136,105 @@
             </dd>
         </dl>
     </div>
+</section>
+
+<!-- 板块 D：当前动态权重 -->
+<section class="panel panel-d" id="panel-weights">
+    <h2 class="panel-title">板块 D · 当前动态权重</h2>
+    <p class="panel-hint">根据近 7/30 天消息实际价格冲击自动调节（总和恒为 100）</p>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>模块</th>
+                    <th>动态权重</th>
+                    <th>原固定权重</th>
+                    <th>变化</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if weight_optimizer.dynamic_weights %}
+                    {% for row in weight_optimizer.dynamic_weights %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td><strong>{{ row.weight }}%</strong></td>
+                        <td>{{ row.static_weight }}%</td>
+                        <td class="{% if row.delta > 0 %}impact-pos{% elif row.delta < 0 %}impact-neg{% endif %}">
+                            {% if row.delta > 0 %}+{% endif %}{{ row.delta }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="4" class="empty-row">等待首轮权重计算（每 6 小时或每次拉取后更新）</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% if weight_optimizer.weights_method %}
+    <p class="panel-hint">模式：{{ weight_optimizer.weights_method }} · 更新：{{ weight_optimizer.weights_updated_at or '—' }}</p>
+    {% endif %}
+</section>
+
+<!-- 板块 E：模块市场影响力 -->
+<section class="panel panel-e" id="panel-influence">
+    <h2 class="panel-title">板块 E · 各模块实际市场影响力（近 {{ weight_optimizer.influence_window_days or 30 }} 天）</h2>
+    <div class="table-wrap">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>模块</th>
+                    <th>影响力分数</th>
+                    <th>样本条数</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if weight_optimizer.module_influence %}
+                    {% for row in weight_optimizer.module_influence %}
+                    <tr>
+                        <td>{{ row.name }}</td>
+                        <td>{{ row.influence }}</td>
+                        <td>{{ row.samples }}</td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr><td colspan="3" class="empty-row">需积累 TOP10 资讯满 24h 后自动测算实际冲击</td></tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<!-- 板块 F：历史回测摘要 -->
+<section class="panel panel-f" id="panel-backtest">
+    <h2 class="panel-title">板块 F · 历史回测结果摘要</h2>
+    {% set bt = weight_optimizer.backtest or {} %}
+    {% if bt %}
+    <div class="log-box">
+        <dl class="log-dl">
+            <dt>回测区间</dt>
+            <dd>{{ bt.start_date }} ~ {{ bt.end_date }}（{{ bt.sample_days }} 个有效日）</dd>
+            <dt>方向准确率</dt>
+            <dd>固定权重 {{ bt.fixed_accuracy }} · 动态权重 {{ bt.dynamic_accuracy }}</dd>
+            <dt>相关性</dt>
+            <dd>固定 {{ bt.fixed_correlation }} · 动态 {{ bt.dynamic_correlation }}</dd>
+            <dt>回测最优权重</dt>
+            <dd>
+                宏观 {{ bt.optimal_weights.macro }} ·
+                监管 {{ bt.optimal_weights.regulation }} ·
+                资金 {{ bt.optimal_weights.funding }} ·
+                币种 {{ bt.optimal_weights.fundamentals }}
+            </dd>
+            <dt>说明</dt>
+            <dd>{{ bt.message }}</dd>
+            {% if bt.csv_path %}
+            <dt>CSV</dt>
+            <dd><code>{{ bt.csv_path }}</code></dd>
+            {% endif %}
+        </dl>
+    </div>
+    {% else %}
+    <p class="panel-hint">尚未运行回测。命令行执行：<code>python weight_optimizer.py --backtest 2024-01-01 2025-05-31</code>
+        或浏览器访问 <code>/api/backtest?start=2024-01-01&amp;end=2025-05-31</code></p>
+    {% endif %}
 </section>
 {% endblock %}

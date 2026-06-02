@@ -8,15 +8,24 @@ web:
   host: "127.0.0.1"          # 本机访问；第六步可改为 0.0.0.0 以支持局域网
   port: 5000
   debug: false
+  page_auto_refresh_seconds: 0  # 页面自动刷新（秒），测试可设 5
 
 # 定时轮询（第二步启用）
 scheduler:
-  enabled: false             # 第一步先关闭，第二步改为 true
-  interval_minutes: 10       # 轮询间隔（分钟），可自定义
+  enabled: true
+  interval_minutes: 10       # 正式：拉取间隔（分钟）
+  interval_seconds: 0        # 测试：>0 时优先，如 5 表示每 5 秒拉取
 
 # 数据存储
 storage:
   log_dir: "data/logs"       # CSV 历史日志目录
+
+collector:
+  request_timeout_sec: 15
+  rss_max_items: 30
+  rss:
+    coindesk: "https://www.coindesk.com/arc/outboundfeeds/rss/"
+    theblock: "https://www.theblock.co/rss.xml"
 
 # ---------------------------------------------------------------------------
 # API 密钥（第三步起逐步使用，暂无密钥可留空）

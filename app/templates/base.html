@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}{{ page_title | default('加密货币行情晴雨分析系统') }}{% endblock %}</title>
+    {% if page_auto_refresh_seconds and page_auto_refresh_seconds > 0 %}
+    <meta http-equiv="refresh" content="{{ page_auto_refresh_seconds }}">
+    {% endif %}
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -16,7 +19,12 @@
             <span class="meta-badge {% if scheduler_enabled %}badge-on{% else %}badge-off{% endif %}">
                 定时任务：{% if scheduler_enabled %}已启用{% else %}未启用（第二步）{% endif %}
             </span>
-            <span class="meta-badge">轮询间隔：{{ poll_interval }} 分钟</span>
+            <span class="meta-badge">拉取间隔：{{ poll_interval_label | default('10 分钟') }}</span>
+            {% if page_auto_refresh_seconds and page_auto_refresh_seconds > 0 %}
+            <span class="meta-badge">页面每 {{ page_auto_refresh_seconds }} 秒自动刷新</span>
+            {% endif %}
+            <span class="meta-badge">已完成拉取：{{ fetch_count | default(0) }} 轮</span>
+            <span class="meta-badge">最近拉取：{{ last_fetch_time | default('—') }}{% if is_fetching %}（进行中…）{% endif %}</span>
             <span class="meta-badge">访问：http://{{ web_host }}:{{ web_port }}</span>
         </div>
     </header>
@@ -26,7 +34,7 @@
     </main>
 
     <footer class="site-footer">
-        <p>第一步：项目骨架与页面布局 · 数据与计分功能将陆续接入</p>
+        <p>动态权重+回测已启用 · 见板块 D/E/F · 回测说明 docs/WEIGHT_OPTIMIZER.md</p>
     </footer>
 </body>
 </html>
