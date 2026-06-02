@@ -41,28 +41,56 @@ CryptMktBarometer/
 └── data/logs/              # 历史 CSV 日志目录
 ```
 
-## 快速启动
+## 快速启动（虚拟环境 · 只开网页）
 
-```bash
-# 1. 进入项目目录
-cd CryptMktBarometer
+适合日常开发：只启动 Flask 网页服务，**不会**弹出 exe 托盘，也**不会**自动打开桌面悬浮球（需 exe 或单独运行 `floating_dashboard.py`）。
 
-# 2. 创建虚拟环境（推荐）
-python -m venv venv
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
+### Windows（PowerShell 或 CMD）
 
-# 3. 安装依赖
+```powershell
+# 1. 进入项目根目录（按你的实际路径修改）
+cd F:\CryptMktBarometer\CryptMktBarometer
+
+# 2. 激活虚拟环境（命令行前会出现 (venv)）
+venv\Scripts\activate
+
+# 3. 首次或依赖变更时安装
 pip install -r requirements.txt
 
-# 4. 复制配置（若尚未有 config.yaml）
+# 4. 若还没有 config.yaml，复制一份再编辑 API 密钥等
 # copy config\config.example.yaml config\config.yaml
 
-# 5. 启动服务
+# 5. 启动（终端保持运行，不要关）
 python main.py
 ```
 
-浏览器打开：**http://127.0.0.1:5000/**（拉取完成后**刷新**页面查看板块 C）
+启动成功后，**用浏览器手动打开**（`main.py` 不会自动弹浏览器）：
+
+- 晴雨表主页：**http://127.0.0.1:5000/**
+- 健康检查：**http://127.0.0.1:5000/health**
+
+停止服务：在运行 `python main.py` 的终端按 `Ctrl+C`。
+
+### macOS / Linux
+
+```bash
+cd CryptMktBarometer
+python3 -m venv venv          # 仅首次需要
+source venv/bin/activate
+pip install -r requirements.txt
+python main.py
+```
+
+浏览器同样访问 **http://127.0.0.1:5000/**。
+
+### 与桌面 exe 的区别
+
+| 方式 | 命令 / 操作 | 托盘 | 自动开浏览器 | 悬浮球 |
+|------|-------------|------|--------------|--------|
+| **源码 · 只网页** | `venv` 激活后 `python main.py` | 无 | 否，需自己打开上述地址 | 无（可选另开 `python floating_dashboard.py`） |
+| **桌面 exe** | 双击 `dist\CryptMktBarometer.exe` | 有 | 是 | 默认有 |
+
+拉取完成后若页面数据仍为空，在浏览器按 **F5** 或 **Ctrl+F5** 刷新一次。
 
 健康检查：**http://127.0.0.1:5000/health**（含 `scheduler` 字段：拉取次数、最近时间）
 

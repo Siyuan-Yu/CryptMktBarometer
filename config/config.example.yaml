@@ -26,9 +26,26 @@ storage:
 collector:
   request_timeout_sec: 15
   rss_max_items: 30
+  rss_macro_max_items: 20
   rss:
     coindesk: "https://www.coindesk.com/arc/outboundfeeds/rss/"
     theblock: "https://www.theblock.co/rss.xml"
+    coinglass: "https://www.coinglass.com/feed"
+    solana: "https://solana.com/news/rss.xml"
+    ethereum_blog: "https://blog.ethereum.org/feed.xml"
+  rss_macro:
+    fed: "https://www.federalreserve.gov/feeds/press_all.xml"
+    bls: "https://www.bls.gov/feed/bls_latest.rss"
+    fred_blog: "https://fredblog.stlouisfed.org/feed/"
+    sec: "https://www.sec.gov/news/pressreleases.rss"
+    reuters: "https://feeds.reuters.com/reuters/businessNews"
+    bloomberg: "https://feeds.bloomberg.com/markets/news.rss"
+    cnbc: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100003114"
+    wsj: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml"
+    marketwatch: "https://feeds.marketwatch.com/marketwatch/topstories/"
+    ft: "https://www.ft.com/rss/home"
+    benzinga: "https://www.benzinga.com/news/feed"
+    wallstreetcn: "https://rss.wallstreetcn.com/"
 
 # ---------------------------------------------------------------------------
 # API 密钥（第三步起逐步使用，暂无密钥可留空）
@@ -49,6 +66,10 @@ data_sources:
     cryptopanic: true
     coindesk: true
     theblock: true
+    coinglass: true
+    solana: true           # SOL 生态专属（Solana 官方 RSS）
+    ethereum_blog: true    # ETH 生态专属（以太坊基金会博客）
+    macro: true            # 美股/宏观专属 RSS（与加密源分离）
   funding:
     coinglass_etf: true
     coinglass_liquidation: true

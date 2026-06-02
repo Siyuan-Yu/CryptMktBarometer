@@ -89,6 +89,90 @@ def merge_scores(title_score: float, extra: float) -> float:
     return max(-10.0, min(10.0, round(combined, 1)))
 
 
+# 美股 / 宏观标题关键词
+_MACRO_BULLISH = (
+    "rate cut",
+    "dovish",
+    "beats expectations",
+    "better than expected",
+    "soft landing",
+    "stimulus",
+    "easing",
+    "降息",
+    "超预期",
+    "软着陆",
+)
+_MACRO_BEARISH = (
+    "rate hike",
+    "hawkish",
+    "hotter than expected",
+    "misses expectations",
+    "recession",
+    "default",
+    "shutdown",
+    "tariff",
+    "加息",
+    "不及预期",
+    "衰退",
+    "通胀高于",
+    "cpi rises",
+    "cpi surge",
+    "higher inflation",
+)
+
+
+def score_from_macro_title(title: str) -> tuple[float, list[str], str]:
+    """宏观/美股标题影响分。"""
+    lower = title.lower()
+    hit_bull = [k for k in _MACRO_BULLISH if k in lower]
+    hit_bear = [k for k in _MACRO_BEARISH if k in lower]
+
+    macro_hits = []
+    for token in (
+        "cpi",
+        "ppi",
+        "pce",
+        "nonfarm",
+        "nfp",
+        "fed",
+        "fomc",
+        "powell",
+        "treasury",
+        "yield",
+        "nasdaq",
+        "s&p",
+        "earnings",
+        "sec",
+        "inflation",
+        "非农",
+        "美联储",
+        "美债",
+        "美股",
+    ):
+        if token in lower:
+            macro_hits.append(token.upper() if token.isascii() else token)
+
+    score = len(hit_bull) * 2.0 - len(hit_bear) * 2.0
+    if macro_hits and not hit_bull and not hit_bear:
+        score = 0.5
+    score = max(-10.0, min(10.0, score))
+
+    keywords = list(dict.fromkeys((hit_bull + hit_bear + macro_hits)))[:5]
+    if not keywords:
+        keywords = _extract_title_tokens(title, limit=3)
+
+    if hit_bull and not hit_bear:
+        logic = f"宏观利多倾向：{', '.join(hit_bull[:3])}"
+    elif hit_bear and not hit_bull:
+        logic = f"宏观利空倾向：{', '.join(hit_bear[:3])}"
+    elif macro_hits:
+        logic = f"宏观数据/政策相关：{', '.join(macro_hits[:4])}"
+    else:
+        logic = "宏观资讯，影响分接近中性"
+
+    return score, keywords, logic
+
+
 def _extract_title_tokens(title: str, limit: int = 3) -> list[str]:
     words = re.findall(r"[A-Za-z]{3,}|[\u4e00-\u9fff]{2,}", title)
     seen: list[str] = []

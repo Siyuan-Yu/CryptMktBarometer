@@ -12,7 +12,7 @@ from typing import Any
 
 from collectors.funding_collect import collect_funding
 from collectors.macro_collect import collect_macro
-from collectors.news_collect import collect_news
+from collectors.news_collect import collect_news_split
 from collectors.news_display import prepare_all_news_views
 from core.config_loader import load_config
 from core.state_store import increment_fetch_count, set_fetching, update_state
@@ -67,9 +67,17 @@ def run_data_fetch() -> FetchResult:
         cfg = load_config(reload=True)
         round_no = increment_fetch_count()
 
-        all_news, news_summary_lines, news_errors = collect_news(cfg)
+        crypto_news, macro_news_items, news_summary_lines, news_errors = (
+            collect_news_split(cfg)
+        )
+        all_news = crypto_news + macro_news_items
         errors.extend(news_errors)
-        news_views = prepare_all_news_views(all_news, top_limit=10, category_limit=10)
+        news_views = prepare_all_news_views(
+            crypto_news,
+            macro_news_items,
+            top_limit=10,
+            category_limit=10,
+        )
         top_news = news_views["top"]
         sol_news = news_views["sol"]
         eth_news = news_views["eth"]

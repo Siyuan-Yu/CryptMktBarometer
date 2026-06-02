@@ -20,6 +20,7 @@ class NewsItem:
     logic: str = ""
     published_at: str = ""
     raw: dict[str, Any] = field(default_factory=dict)
+    feed_type: str = "crypto"  # crypto | macro
 
     def to_display_dict(self) -> dict[str, Any]:
         return {
@@ -27,6 +28,7 @@ class NewsItem:
             "source": self.source,
             "url": self.url,
             "impact_score": round(self.impact_score, 1),
-            "keywords": self.keywords[:3],
+            "keywords": self.keywords[:5],
             "logic": self.logic,
+            "feed_type": self.feed_type,
         }

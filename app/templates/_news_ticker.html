@@ -1,0 +1,32 @@
+{# TOP10 横向滚动：中文标题 + 分值，点击查看详情 #}
+{% macro category_tag_class(label) %}
+    {% if label == 'SOL生态' %}tag-sol
+    {% elif label == 'ETH生态' %}tag-eth
+    {% elif label == '美股宏观' %}tag-macro
+    {% else %}tag-crypto{% endif %}
+{% endmacro %}
+
+{% macro news_ticker_card(item, rank) %}
+{% set label = item.category_label or item.source_tag or '全市场加密' %}
+<button type="button" class="ticker-chip" data-news-open="{{ rank - 1 }}" aria-label="查看资讯详情">
+    <span class="cat-tag {{ category_tag_class(label) }}">{{ label }}</span>
+    <span class="ticker-chip-rank">#{{ rank }}</span>
+    <span class="ticker-chip-title">{{ item.title_cn or item.display_title or item.title }}</span>
+    <span class="ticker-chip-score {% if item.impact_score > 0 %}impact-pos{% elif item.impact_score < 0 %}impact-neg{% endif %}">
+        {% if item.impact_score > 0 %}+{% endif %}{{ item.impact_score }}分
+    </span>
+</button>
+{% endmacro %}
+
+{% macro news_ticker_track(items) %}
+    {% if items %}
+        {% for item in items %}
+            {{ news_ticker_card(item, loop.index) }}
+        {% endfor %}
+        {% for item in items %}
+            {{ news_ticker_card(item, loop.index) }}
+        {% endfor %}
+    {% else %}
+        <span class="ticker-chip ticker-chip-empty">等待定时任务抓取 TOP10 资讯…</span>
+    {% endif %}
+{% endmacro %}

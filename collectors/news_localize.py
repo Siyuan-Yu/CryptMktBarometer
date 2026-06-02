@@ -1,6 +1,6 @@
 """
-资讯中文化：标题翻译、关键词翻译、1~2 句中文摘要
-优先规则词典 + 可选在线翻译（失败时回退），不依赖外部付费 API。
+资讯中文化：纯中文标题、规范摘要、中文关键词胶囊
+词典 + 可选在线翻译；剔除中英混杂残留。
 """
 
 from __future__ import annotations
@@ -14,7 +14,9 @@ from collectors.types import NewsItem
 
 logger = logging.getLogger(__name__)
 
-# 英文短语 → 中文（长词优先匹配）
+_EN_TOKEN = re.compile(r"[A-Za-z][A-Za-z0-9'’.-]{1,}")
+_LATIN_CHUNK = re.compile(r"[A-Za-z]{4,}")
+
 _PHRASE_MAP: tuple[tuple[str, str], ...] = tuple(
     sorted(
         [
@@ -25,21 +27,22 @@ _PHRASE_MAP: tuple[tuple[str, str], ...] = tuple(
             ("nonfarm payroll", "非农就业"),
             ("jobs report", "就业报告"),
             ("treasury yield", "国债收益率"),
-            ("10-year yield", "10年期收益率"),
-            ("stock market", "股市"),
+            ("10-year yield", "10年期美债收益率"),
+            ("stock market", "美国股市"),
             ("wall street", "华尔街"),
-            ("s&p 500", "标普500"),
-            ("nasdaq", "纳斯达克"),
-            ("dow jones", "道琼斯"),
+            ("s&p 500", "标普500指数"),
+            ("nasdaq", "纳斯达克指数"),
+            ("dow jones", "道琼斯指数"),
+            ("earnings report", "财报"),
+            ("inflation data", "通胀数据"),
+            ("pay.sh", "Pay.sh支付"),
+            ("solana foundation", "Solana基金会"),
             ("open interest", "持仓量"),
-            ("price change", "价格变动"),
             ("record high", "创历史新高"),
             ("all-time high", "历史新高"),
-            ("all time high", "历史新高"),
             ("breaking", "突发"),
             ("approval", "获批"),
             ("approved", "已批准"),
-            ("rejected", "遭否决"),
             ("lawsuit", "诉讼"),
             ("investigation", "调查"),
             ("liquidation", "爆仓清算"),
@@ -53,45 +56,39 @@ _PHRASE_MAP: tuple[tuple[str, str], ...] = tuple(
             ("delist", "下架"),
             ("hack", "黑客攻击"),
             ("exploit", "漏洞利用"),
-            ("vulnerability", "安全漏洞"),
-            ("bankrupt", "破产"),
-            ("sanction", "制裁"),
             ("regulation", "监管"),
-            ("etf", "ETF"),
-            ("inflation", "通胀"),
-            ("deflation", "通缩"),
-            ("recession", "衰退"),
+            ("etf", "交易所交易基金"),
+            ("inflation", "通货膨胀"),
+            ("recession", "经济衰退"),
             ("bullish", "看多"),
             ("bearish", "看空"),
             ("surge", "大涨"),
             ("plunge", "暴跌"),
             ("rally", "反弹"),
             ("crash", "崩盘"),
-            ("breakout", "突破"),
-            ("solana", "Solana"),
+            ("solana", "索拉纳公链"),
             ("ethereum", "以太坊"),
             ("bitcoin", "比特币"),
-            ("crypto", "加密"),
+            ("crypto", "加密货币"),
             ("cryptocurrency", "加密货币"),
             ("blockchain", "区块链"),
             ("staking", "质押"),
             ("sec", "美国证监会"),
-            ("cpi", "CPI消费者物价"),
-            ("ppi", "PPI生产者物价"),
-            ("fomc", "FOMC议息会议"),
-            ("powell", "鲍威尔"),
-            ("fed", "美联储"),
-            ("holds rates", "维持利率不变"),
-            ("holds", "维持"),
-            ("rates", "利率"),
-            ("rally", "上涨"),
-            ("tumble", "下跌"),
-            ("markets", "市场"),
+            ("cpi", "消费者物价指数"),
+            ("ppi", "生产者物价指数"),
+            ("fomc", "美联储议息会议"),
+            ("powell", "美联储主席鲍威尔"),
+            ("vitalik", "以太坊创始人维塔利克"),
+            ("proposes", "提议"),
+            ("proposal", "提案"),
+            ("announces", "宣布"),
+            ("according to", "据报道"),
+            ("report", "报告"),
             ("market", "市场"),
-            ("completes", "完成"),
-            ("upgrade", "升级"),
-            ("record", "创新高"),
-            ("hits", "触及"),
+            ("markets", "市场"),
+            ("trump", "特朗普"),
+            ("tariff", "关税"),
+            ("tariffs", "关税"),
         ],
         key=lambda x: -len(x[0]),
     )
@@ -100,29 +97,39 @@ _PHRASE_MAP: tuple[tuple[str, str], ...] = tuple(
 _KEYWORD_CN: dict[str, str] = {
     "BTC": "比特币",
     "ETH": "以太坊",
-    "SOL": "Solana",
-    "ETF": "ETF",
-    "SEC": "证监会",
-    "CPI": "CPI",
+    "SOL": "索拉纳",
+    "ETF": "交易基金",
+    "SEC": "美国证监会",
+    "CPI": "消费者物价",
+    "PPI": "生产者物价",
     "FED": "美联储",
-    "FOMC": "FOMC",
-    "NFT": "NFT",
-    "DeFi": "DeFi",
+    "FOMC": "议息会议",
+    "NFT": "非同质化代币",
+    "DEFI": "去中心化金融",
     "L2": "二层网络",
+    "NFP": "非农就业",
+    "PMI": "采购经理指数",
+    "GDP": "国内生产总值",
+    "DXY": "美元指数",
 }
+
+
+def _chinese_ratio(text: str) -> float:
+    if not text:
+        return 0.0
+    cn = len(re.findall(r"[\u4e00-\u9fff]", text))
+    return cn / max(len(text), 1)
 
 
 def _is_mainly_chinese(text: str) -> bool:
     if not text:
         return False
-    cn = len(re.findall(r"[\u4e00-\u9fff]", text))
-    return cn >= max(4, len(text) * 0.25)
+    return _chinese_ratio(text) >= 0.45
 
 
 @lru_cache(maxsize=512)
 def _translate_online(text: str) -> str | None:
-    """可选：deep-translator 在线翻译（未安装或失败返回 None）。"""
-    if _is_mainly_chinese(text) or len(text) < 3:
+    if _is_mainly_chinese(text) or len(text) < 2:
         return text
     try:
         from deep_translator import GoogleTranslator
@@ -133,7 +140,6 @@ def _translate_online(text: str) -> str | None:
 
 
 def translate_phrases(text: str) -> str:
-    """词典替换 + 可选在线补全。"""
     if not text:
         return ""
     if _is_mainly_chinese(text):
@@ -149,6 +155,52 @@ def translate_phrases(text: str) -> str:
     return out.strip()
 
 
+def _strip_latin_fragments(text: str) -> str:
+    """删除残留英文字符，保留已有中文与数字标点。"""
+    t = re.sub(r"[A-Za-z][A-Za-z0-9'’.-]*", " ", text)
+    t = re.sub(r"\s+", " ", t)
+    t = re.sub(r"[·•|]{2,}", "·", t)
+    t = re.sub(r"^[，。、\s]+|[，。、\s]+$", "", t)
+    return t.strip()
+
+
+def polish_chinese_text(text: str, *, force_full_translate: bool = False) -> str:
+    """润色为通顺纯中文，剔除零散英文碎片。"""
+    if not text:
+        return ""
+    raw = text.strip()
+
+    if force_full_translate or not _is_mainly_chinese(raw):
+        online = _translate_online(raw)
+        if online and online.strip():
+            raw = online.strip()
+        else:
+            raw = translate_phrases(raw)
+    else:
+        raw = translate_phrases(raw)
+
+    if _EN_TOKEN.search(raw) or _LATIN_CHUNK.search(raw):
+        online = _translate_online(text)
+        if online and online.strip():
+            raw = online.strip()
+
+    raw = _strip_latin_fragments(raw)
+    return raw or "市场相关资讯"
+
+
+def to_pure_chinese_title(title: str) -> str:
+    """标题仅输出纯中文。"""
+    raw = (title or "").strip()
+    if not raw:
+        return "暂无标题"
+    cn = polish_chinese_text(raw, force_full_translate=True)
+    if _EN_TOKEN.search(cn):
+        online = _translate_online(title)
+        if online:
+            cn = _strip_latin_fragments(online)
+    return cn or "市场相关资讯"
+
+
 def localize_keywords(keywords: list[str]) -> list[str]:
     result: list[str] = []
     for kw in keywords:
@@ -157,20 +209,23 @@ def localize_keywords(keywords: list[str]) -> list[str]:
             continue
         upper = k.upper()
         if upper in _KEYWORD_CN:
-            result.append(_KEYWORD_CN[upper])
+            cn = _KEYWORD_CN[upper]
         elif _is_mainly_chinese(k):
-            result.append(k)
+            cn = polish_chinese_text(k)
         else:
-            result.append(translate_phrases(k))
-    return list(dict.fromkeys(result))[:5]
+            cn = polish_chinese_text(translate_phrases(k))
+        if cn and cn not in result:
+            result.append(cn)
+    return result[:5]
 
 
-def market_bias_label(score: float) -> str:
-    if score >= 2:
-        return "偏多（利多）"
-    if score <= -2:
-        return "偏空（利空）"
-    return "中性"
+def impact_suffix(score: float) -> str:
+    s = float(score)
+    if s > 0:
+        return f"【利多：+{s:.1f}分】"
+    if s < 0:
+        return f"【利空：{s:.1f}分】"
+    return "【中性：0分】"
 
 
 def generate_summary_cn(
@@ -179,39 +234,42 @@ def generate_summary_cn(
     impact_score: float,
     logic: str = "",
 ) -> str:
-    """生成 1~2 句中文核心摘要。"""
-    bias = market_bias_label(impact_score)
-    core = title_cn[:120] if title_cn else "市场相关资讯"
-
-    if logic and _is_mainly_chinese(logic):
-        hint = logic.split("；")[0][:80]
-        return f"{core}。{hint}，对市场{bias}。"
+    """摘要 = 中文简述 + 【利多/利空：xx分】"""
+    core = (title_cn or "市场相关资讯")[:100]
+    hint = ""
     if logic:
-        logic_cn = translate_phrases(logic.split("；")[0])[:80]
-        return f"{core}。{logic_cn}，对市场{bias}。"
+        hint = polish_chinese_text(
+            logic.split("；")[0].split(";")[0], force_full_translate=True
+        )[:72]
+        hint = re.sub(r"社区投票.*", "", hint).strip()
+        hint = re.sub(r"标题含.*", "", hint).strip()
 
-    if impact_score >= 2:
-        return f"{core}。该消息短期利好风险资产，对市场{bias}。"
-    if impact_score <= -2:
-        return f"{core}。该消息可能引发抛压或避险情绪，对市场{bias}。"
-    return f"{core}。影响有限，当前评估为{bias}。"
+    if hint and len(hint) > 6 and hint not in core:
+        body = f"{core}。{hint.rstrip('。')}。"
+    else:
+        body = f"{core}。"
+
+    return body + impact_suffix(impact_score)
 
 
 def build_display_fields(item: NewsItem) -> dict[str, Any]:
-    """为展示字典追加中文字段（不修改原始 title）。"""
-    title_cn = translate_phrases(item.title)
+    from collectors.news_categories import classify_news_tag
+
+    title_cn = to_pure_chinese_title(item.title)
     keywords_cn = localize_keywords(item.keywords)
-    logic_cn = translate_phrases(item.logic) if item.logic else ""
     summary_cn = generate_summary_cn(
         title_cn,
         impact_score=item.impact_score,
         logic=item.logic,
     )
+    tag = classify_news_tag(item)
     return {
         "title_cn": title_cn,
         "summary_cn": summary_cn,
         "keywords_cn": keywords_cn,
-        "logic_cn": logic_cn,
+        "logic_cn": polish_chinese_text(item.logic) if item.logic else "",
         "display_title": title_cn,
         "display_keywords": keywords_cn,
+        "category_label": tag,
+        "source_tag": tag,
     }

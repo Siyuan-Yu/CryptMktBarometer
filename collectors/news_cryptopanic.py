@@ -83,6 +83,7 @@ def fetch_cryptopanic(
                 logic=f"{logic}；{vote_logic}",
                 published_at=str(row.get("published_at") or ""),
                 raw=row,
+                feed_type="crypto",
             )
         )
 

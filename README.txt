@@ -2,6 +2,35 @@
   加密货币行情晴雨表 (CryptMktBarometer) — Windows 桌面版 EXE 使用说明
 ================================================================================
 
+零、源码运行（虚拟环境 · 只开网页，不要 exe）
+--------------------------------------------------------------------------------
+  适合改代码、看网页 UI，不打包、不双击 exe。
+
+  1. 打开 PowerShell 或 CMD，进入项目根目录，例如：
+       cd F:\CryptMktBarometer\CryptMktBarometer
+
+  2. 激活虚拟环境（成功时提示符前会有 (venv)）：
+       venv\Scripts\activate
+
+  3. 首次或更新依赖后：
+       pip install -r requirements.txt
+
+  4. 启动服务（窗口不要关）：
+       python main.py
+
+  5. 自己打开浏览器访问（不会自动弹窗）：
+       http://127.0.0.1:5000/
+
+  6. 结束：在该终端按 Ctrl+C
+
+  说明：
+    - 与 exe 共用 config\config.yaml、data\ 目录，数据不丢。
+    - 需要悬浮小窗且 Flask 已在跑时，可另开终端执行：
+        venv\Scripts\activate
+        python floating_dashboard.py
+    - 更完整的开发说明见项目根目录 README.md
+
+
 一、如何打包（生成单个 exe）
 --------------------------------------------------------------------------------
 前提：已安装 Python 3.11+，项目内已有 venv 且能正常运行 python main.py

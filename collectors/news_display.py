@@ -1,5 +1,5 @@
 """
-资讯展示层：中文化 + 分类 TOP 列表
+资讯展示层：中文化 + 分类 TOP 列表（加密池 / 宏观池分离）
 """
 
 from __future__ import annotations
@@ -13,31 +13,51 @@ from collectors.types import NewsItem
 
 
 def news_item_to_display(item: NewsItem) -> dict[str, Any]:
-    """单条资讯 → 页面/API 用字典（含中文标题、摘要、关键词）。"""
+    """单条资讯 → 页面/API 用字典（含中文标题、摘要、来源标签）。"""
     base = item.to_display_dict()
     base.update(build_display_fields(item))
     return base
 
 
 def prepare_all_news_views(
-    items: list[NewsItem],
+    crypto_items: list[NewsItem],
+    macro_items: list[NewsItem] | None = None,
     *,
     top_limit: int = 10,
     category_limit: int = 10,
 ) -> dict[str, list[dict[str, Any]]]:
     """
     生成 TOP10 与三大分类列表。
-    分类之间过滤独立，允许与 TOP10 重叠（同属重磅且相关）。
+    - TOP10：加密 + 宏观合并排序
+    - SOL/ETH：仅加密池
+    - 宏观：仅宏观池（剔除加密关键词）
     """
+    macro_items = macro_items or []
+    combined = crypto_items + macro_items
+
     return {
-        "top": select_top_news(items, limit=top_limit, to_display=news_item_to_display),
+        "top": select_top_news(
+            combined, limit=top_limit, to_display=news_item_to_display
+        ),
         "sol": select_category_top(
-            items, "sol", limit=category_limit, to_display=news_item_to_display
+            crypto_items,
+            "sol",
+            limit=category_limit,
+            to_display=news_item_to_display,
+            pool="crypto",
         ),
         "eth": select_category_top(
-            items, "eth", limit=category_limit, to_display=news_item_to_display
+            crypto_items,
+            "eth",
+            limit=category_limit,
+            to_display=news_item_to_display,
+            pool="crypto",
         ),
         "macro": select_category_top(
-            items, "macro", limit=category_limit, to_display=news_item_to_display
+            macro_items if macro_items else combined,
+            "macro",
+            limit=category_limit,
+            to_display=news_item_to_display,
+            pool="macro" if macro_items else None,
         ),
     }

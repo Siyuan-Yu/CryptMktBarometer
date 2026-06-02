@@ -39,6 +39,22 @@
 
     {% block footer_extra %}{% endblock %}
 
+    <div id="news-modal" class="news-modal" hidden aria-hidden="true" role="dialog" aria-labelledby="news-modal-title">
+        <div class="news-modal-backdrop" data-news-close></div>
+        <div class="news-modal-panel">
+            <button type="button" class="news-modal-close" data-news-close aria-label="关闭">×</button>
+            <span id="news-modal-tag" class="cat-tag tag-crypto"></span>
+            <h2 id="news-modal-title" class="news-modal-title"></h2>
+            <p id="news-modal-summary" class="news-modal-summary"></p>
+            <div id="news-modal-keywords" class="news-modal-keywords"></div>
+            <dl class="news-modal-meta">
+                <dt>影响分值</dt><dd id="news-modal-score"></dd>
+                <dt>来源</dt><dd id="news-modal-source"></dd>
+                <dt>原文链接</dt><dd id="news-modal-link"></dd>
+            </dl>
+        </div>
+    </div>
+
     <script>
         window.DASHBOARD_CONFIG = {
             refreshSeconds: {{ dashboard_refresh_seconds | default(30) }},

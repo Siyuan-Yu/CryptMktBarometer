@@ -11,14 +11,21 @@ from typing import Any
 
 import feedparser
 
+from collections.abc import Callable
+
 from collectors.news_impact import score_from_title
 from collectors.types import NewsItem
+
+ScoreFn = Callable[[str], tuple[float, list[str], str]]
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_FEEDS = {
     "CoinDesk": "https://www.coindesk.com/arc/outboundfeeds/rss/",
     "The Block": "https://www.theblock.co/rss.xml",
+    "CoinGlass": "https://www.coinglass.com/feed",
+    "Solana生态": "https://solana.com/news/rss.xml",
+    "以太坊生态": "https://blog.ethereum.org/feed.xml",
 }
 
 
@@ -28,6 +35,8 @@ def fetch_rss_feed(
     *,
     timeout: int = 15,
     max_items: int = 30,
+    feed_type: str = "crypto",
+    score_fn: ScoreFn | None = None,
 ) -> tuple[list[NewsItem], str | None]:
     """
     解析单个 RSS 源。
@@ -64,7 +73,8 @@ def fetch_rss_feed(
             except Exception:
                 published = str(entry.get("published", ""))
 
-        impact, keywords, logic = score_from_title(title)
+        score = score_fn or score_from_title
+        impact, keywords, logic = score(title)
         items.append(
             NewsItem(
                 title=title,
@@ -75,6 +85,7 @@ def fetch_rss_feed(
                 logic=logic,
                 published_at=published,
                 raw=dict(entry),
+                feed_type=feed_type,
             )
         )
 
@@ -92,8 +103,20 @@ def fetch_rss_by_key(
     mapping = {
         "coindesk": ("CoinDesk", feed_urls.get("coindesk") or DEFAULT_FEEDS["CoinDesk"]),
         "theblock": ("The Block", feed_urls.get("theblock") or DEFAULT_FEEDS["The Block"]),
+        "coinglass": ("CoinGlass", feed_urls.get("coinglass") or DEFAULT_FEEDS["CoinGlass"]),
+        "solana": ("Solana生态", feed_urls.get("solana") or DEFAULT_FEEDS["Solana生态"]),
+        "ethereum_blog": (
+            "以太坊生态",
+            feed_urls.get("ethereum_blog") or DEFAULT_FEEDS["以太坊生态"],
+        ),
     }
     if source_key not in mapping:
         return [], f"未知 RSS 源：{source_key}"
     name, url = mapping[source_key]
-    return fetch_rss_feed(name, str(url), timeout=timeout, max_items=max_items)
+    return fetch_rss_feed(
+        name,
+        str(url),
+        timeout=timeout,
+        max_items=max_items,
+        feed_type="crypto",
+    )

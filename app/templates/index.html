@@ -1,51 +1,141 @@
 {% extends "base.html" %}
 {% from '_news_table.html' import news_rows %}
+{% from '_news_ticker.html' import news_ticker_track %}
 
 {% block content %}
-<!-- 实时价格卡片 -->
-<section class="price-strip" id="price-strip">
-    <div class="price-card" id="price-btc">
-        <div class="price-label">BTC</div>
-        <div class="price-value" data-price-value>—</div>
-        <div class="price-change" data-price-change>24h —</div>
+
+<!-- ========== ① 顶部大号实时价格（永久显示 · 5秒刷新） ========== -->
+<section class="price-hero-strip" id="price-hero-strip" aria-label="实时价格">
+    <div class="price-hero glass capsule" id="price-btc" data-coin="BTC">
+        <div class="price-hero-icon">₿</div>
+        <div class="price-hero-body">
+            <span class="price-hero-tag">BTC</span>
+            <span class="price-hero-val" data-price-value>—</span>
+            <span class="price-hero-chg" data-price-change>24h —</span>
+        </div>
+        <div class="price-hero-glow"></div>
     </div>
-    <div class="price-card" id="price-eth">
-        <div class="price-label">ETH</div>
-        <div class="price-value" data-price-value>—</div>
-        <div class="price-change" data-price-change>24h —</div>
+    <div class="price-hero glass capsule" id="price-eth" data-coin="ETH">
+        <div class="price-hero-icon">Ξ</div>
+        <div class="price-hero-body">
+            <span class="price-hero-tag">ETH</span>
+            <span class="price-hero-val" data-price-value>—</span>
+            <span class="price-hero-chg" data-price-change>24h —</span>
+        </div>
+        <div class="price-hero-glow"></div>
     </div>
-    <div class="price-card" id="price-sol">
-        <div class="price-label">SOL</div>
-        <div class="price-value" data-price-value>—</div>
-        <div class="price-change" data-price-change>24h —</div>
+    <div class="price-hero glass capsule" id="price-sol" data-coin="SOL">
+        <div class="price-hero-icon">◎</div>
+        <div class="price-hero-body">
+            <span class="price-hero-tag">SOL</span>
+            <span class="price-hero-val" data-price-value>—</span>
+            <span class="price-hero-chg" data-price-change>24h —</span>
+        </div>
+        <div class="price-hero-glow"></div>
     </div>
-    <div class="price-meta">
-        <span>数据源：<span id="price-source">—</span></span>
-        <span>更新：<span id="price-updated">—</span></span>
+    <p class="price-hero-meta">
+        <span class="live-dot"></span> 实时价格 · 每 {{ price_refresh_seconds | default(5) }} 秒刷新
+        · 更新 <span id="price-updated">—</span>
+        · <span id="price-source">—</span>
+    </p>
+</section>
+
+<!-- ========== ② 中央大型圆形晴雨表盘（与悬浮球同风格） ========== -->
+<section class="hub-stage" id="hub-stage" aria-label="中央晴雨表盘">
+    <div class="hub-glow hub-glow-a"></div>
+    <div class="hub-glow hub-glow-b"></div>
+    <div class="hub-center">
+        <div class="firefly-gauge glass-disc" id="firefly-gauge"
+             data-rating-class="{{ rating_class }}"
+             data-active-state="{% if rating_class == 'rating-bull-strong' %}bull-strong{% elif rating_class == 'rating-bull' %}bull{% elif rating_class == 'rating-bear' %}bear{% elif rating_class == 'rating-bear-strong' %}bear-strong{% else %}neutral{% endif %}"
+             style="--score-pct: {{ ((total_score | float) / 100) if total_score is not none else 0 }};">
+            <svg class="gauge-svg" viewBox="0 0 400 400" aria-hidden="true">
+                <defs>
+                    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" id="grad-stop-a" stop-color="#8ed8ff"/>
+                        <stop offset="50%" id="grad-stop-b" stop-color="#c4b0ff"/>
+                        <stop offset="100%" id="grad-stop-c" stop-color="#ffb8d8"/>
+                    </linearGradient>
+                    <filter id="glow">
+                        <feGaussianBlur stdDeviation="6" result="b"/>
+                        <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+                    </filter>
+                </defs>
+                <circle class="ring-track" cx="200" cy="200" r="178" fill="none" stroke-width="14"/>
+                <circle class="ring-seg ring-seg-1" cx="200" cy="200" r="178" fill="none" stroke-width="14"
+                    stroke-dasharray="56 1060" stroke-dashoffset="0"/>
+                <circle class="ring-seg ring-seg-2" cx="200" cy="200" r="178" fill="none" stroke-width="14"
+                    stroke-dasharray="56 1060" stroke-dashoffset="-112"/>
+                <circle class="ring-seg ring-seg-3" cx="200" cy="200" r="178" fill="none" stroke-width="14"
+                    stroke-dasharray="56 1060" stroke-dashoffset="-224"/>
+                <circle class="ring-seg ring-seg-4" cx="200" cy="200" r="178" fill="none" stroke-width="14"
+                    stroke-dasharray="56 1060" stroke-dashoffset="-336"/>
+                <circle class="ring-seg ring-seg-5" cx="200" cy="200" r="178" fill="none" stroke-width="14"
+                    stroke-dasharray="56 1060" stroke-dashoffset="-448"/>
+                <circle class="ring-progress" id="gauge-ring-progress" cx="200" cy="200" r="162"
+                    fill="none" stroke="url(#ringGrad)" stroke-width="10" stroke-linecap="round"
+                    transform="rotate(-90 200 200)"
+                    stroke-dasharray="1017.88" stroke-dashoffset="1017.88"/>
+            </svg>
+            <div class="gauge-face">
+                <span class="gauge-kicker">☀ 加密晴雨</span>
+                <p class="gauge-score" id="gauge-score">{% if total_score is not none %}{{ total_score | round(0) | int }}{% else %}—{% endif %}</p>
+                <p class="gauge-unit">综合得分 / 100</p>
+                <p class="gauge-rating {{ rating_class }}" id="gauge-rating">{{ rating_label }}</p>
+            </div>
+            <ul class="ring-states" aria-label="市场状态">
+                <li class="ring-state" data-state="bull-strong"><span>强利多</span></li>
+                <li class="ring-state" data-state="bull"><span>利多</span></li>
+                <li class="ring-state" data-state="neutral"><span>中性</span></li>
+                <li class="ring-state" data-state="bear"><span>利空</span></li>
+                <li class="ring-state" data-state="bear-strong"><span>强利空</span></li>
+            </ul>
+        </div>
     </div>
 </section>
 
-<!-- 板块 A：大盘晴雨计分总表 -->
-<section class="panel panel-a" id="panel-score">
+<!-- ========== ②b 四大分项权重 + 得分（圆盘下方） ========== -->
+<section class="weight-score-strip" id="weight-score-strip" aria-label="分项权重与得分">
+    {% for cat in categories %}
+    {% set dw = (weight_optimizer.dynamic_weights or [])[loop.index0] if weight_optimizer.dynamic_weights else none %}
+    <div class="wsc-card" data-cat-index="{{ loop.index0 }}">
+        <p class="wsc-name">{{ cat.name }}</p>
+        <p class="wsc-weight"><span class="wsc-label">动态权重</span> <strong class="wsc-weight-val" data-wsc-weight>{% if dw %}{{ dw.weight }}%{% elif cat.weight is not none %}{{ cat.weight }}%{% else %}—{% endif %}</strong></p>
+        <p class="wsc-score"><span class="wsc-label">分项得分</span> <strong class="wsc-score-val" data-wsc-score>{% if cat.score is not none %}{{ cat.score | round(1) }}{% else %}—{% endif %}</strong></p>
+    </div>
+    {% endfor %}
+</section>
+
+<!-- ========== ③ TOP10 横向滚动（标题+分值 · 点击查看详情） ========== -->
+<section class="panel panel-ticker panel-readable panel-full" id="panel-news-ticker">
+    <div class="ticker-header">
+        <h2 class="panel-title">📡 TOP10 重磅资讯 · 横向滚动</h2>
+        <span class="ticker-badge">点击条目查看完整摘要</span>
+    </div>
+    <div class="ticker-marquee-x ticker-marquee-main" id="ticker-marquee-x">
+        <div class="ticker-marquee-x-inner" id="news-ticker-track">
+            {{ news_ticker_track(top_news) }}
+        </div>
+    </div>
+</section>
+
+<!-- ========== ④ 环绕模块（信息完整保留） ========== -->
+<div class="orbit-grid">
+
+<section class="panel panel-a panel-readable" id="panel-score">
     <h2 class="panel-title">板块 A · 大盘晴雨计分总表</h2>
+    <p class="panel-hint">分项得分与权重 · 与中央圆盘同步</p>
     <div class="table-wrap">
         <table class="data-table score-table">
             <thead>
-                <tr>
-                    <th>大类名称</th>
-                    <th>权重占比</th>
-                    <th>当前分项得分</th>
-                    <th>分项简要说明</th>
-                </tr>
+                <tr><th>大类名称</th><th>权重占比</th><th>当前得分</th><th>简要说明</th></tr>
             </thead>
             <tbody id="score-tbody">
                 {% for cat in categories %}
                 <tr>
                     <td>{{ cat.name }}</td>
                     <td>{{ cat.weight }}%</td>
-                    <td class="score-cell">
-                        {% if cat.score is not none %}{{ cat.score | round(1) }}{% else %}—{% endif %}
-                    </td>
+                    <td class="score-cell">{% if cat.score is not none %}{{ cat.score | round(1) }}{% else %}—{% endif %}</td>
                     <td class="summary-cell">{{ cat.summary }}</td>
                 </tr>
                 {% endfor %}
@@ -53,202 +143,118 @@
             <tfoot>
                 <tr class="total-row">
                     <td colspan="2"><strong>综合总分</strong></td>
-                    <td class="total-score-cell" id="total-score">
-                        {% if total_score is not none %}
-                            <strong>{{ total_score | round(1) }}</strong> / 100
-                        {% else %}
-                            <strong>—</strong>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <span class="rating-tag {{ rating_class }}" id="rating-tag">当前市场评级：{{ rating_label }}</span>
-                    </td>
+                    <td class="total-score-cell" id="total-score">{% if total_score is not none %}<strong>{{ total_score | round(1) }}</strong>{% else %}<strong>—</strong>{% endif %}</td>
+                    <td><span class="rating-tag {{ rating_class }}" id="rating-tag">{{ rating_label }}</span></td>
                 </tr>
             </tfoot>
         </table>
     </div>
-    <p class="panel-hint">评级规则：&gt;70 强利多 · 55~70 偏利多 · 45~55 中性 · 30~45 偏利空 · &lt;30 强利空</p>
 </section>
 
-<!-- 板块 B：TOP10 重磅资讯（中文） -->
-<section class="panel panel-b" id="panel-news">
-    <h2 class="panel-title">板块 B · TOP10 重磅资讯（中文摘要）</h2>
+<section class="panel panel-b panel-readable panel-full" id="panel-news">
+    <h2 class="panel-title">板块 B · TOP10 完整列表</h2>
     <div class="table-wrap">
-        <table class="data-table news-table">
+        <table class="data-table news-table news-table-fixed">
+            <colgroup>
+                <col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta">
+            </colgroup>
             <thead>
-                <tr>
-                    <th>#</th>
-                    <th>中文标题</th>
-                    <th>中文摘要</th>
-                    <th>关键词</th>
-                    <th>分值</th>
-                    <th>来源</th>
-                    <th>链接</th>
-                </tr>
+                <tr><th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值·来源·链接</th></tr>
             </thead>
-            <tbody id="news-tbody">
-                {{ news_rows(top_news) }}
-            </tbody>
+            <tbody id="news-tbody">{{ news_rows(top_news) }}</tbody>
         </table>
     </div>
 </section>
 
-<!-- 板块 G：SOL 专属 -->
-<section class="panel panel-g" id="panel-sol">
-    <h2 class="panel-title">板块 G · SOL 专属 TOP 资讯</h2>
-    <p class="panel-hint">仅显示与 Solana / SOL 生态强相关的消息，不含混杂宏观或纯 BTC 内容。</p>
+<section class="panel panel-g panel-readable" id="panel-sol">
+    <h2 class="panel-title">板块 G · SOL 专属 TOP</h2>
+    <p class="panel-hint">仅 Solana / SOL 生态相关</p>
     <div class="table-wrap">
-        <table class="data-table news-table">
-            <thead>
-                <tr>
-                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
-                </tr>
-            </thead>
+        <table class="data-table news-table news-table-fixed">
+            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
+            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
             <tbody id="sol-news-tbody">{{ news_rows(sol_news) }}</tbody>
         </table>
     </div>
 </section>
 
-<!-- 板块 H：ETH 专属 -->
-<section class="panel panel-h" id="panel-eth">
-    <h2 class="panel-title">板块 H · ETH 专属 TOP 资讯</h2>
-    <p class="panel-hint">仅显示与以太坊 / ETH / L2 生态强相关的消息。</p>
+<section class="panel panel-h panel-readable" id="panel-eth">
+    <h2 class="panel-title">板块 H · ETH 专属 TOP</h2>
+    <p class="panel-hint">以太坊 / L2 生态相关</p>
     <div class="table-wrap">
-        <table class="data-table news-table">
-            <thead>
-                <tr>
-                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
-                </tr>
-            </thead>
+        <table class="data-table news-table news-table-fixed">
+            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
+            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
             <tbody id="eth-news-tbody">{{ news_rows(eth_news) }}</tbody>
         </table>
     </div>
 </section>
 
-<!-- 板块 I：美股/宏观 -->
-<section class="panel panel-i" id="panel-macro-news">
-    <h2 class="panel-title">板块 I · 美股 / 宏观 TOP 资讯</h2>
-    <p class="panel-hint">CPI、美联储、利率、美股指数、国债收益率等宏观驱动消息。</p>
+<section class="panel panel-i panel-readable" id="panel-macro-news">
+    <h2 class="panel-title">板块 I · 宏观 / 美股 TOP</h2>
+    <p class="panel-hint">CPI · 美联储 · 美股 · 国债收益率</p>
     <div class="table-wrap">
-        <table class="data-table news-table">
-            <thead>
-                <tr>
-                    <th>#</th><th>中文标题</th><th>中文摘要</th><th>关键词</th><th>分值</th><th>来源</th><th>链接</th>
-                </tr>
-            </thead>
+        <table class="data-table news-table news-table-fixed">
+            <colgroup><col class="col-idx"><col class="col-title"><col class="col-summary"><col class="col-kw"><col class="col-meta"></colgroup>
+            <thead><tr><th>#</th><th>标题</th><th>摘要</th><th>关键词</th><th>分值·来源·链接</th></tr></thead>
             <tbody id="macro-news-tbody">{{ news_rows(macro_news) }}</tbody>
         </table>
     </div>
 </section>
 
-<!-- 板块 C：原始数据日志 -->
-<section class="panel panel-c" id="panel-log">
-    <h2 class="panel-title">板块 C · 原始数据日志</h2>
-    <div class="log-box">
-        <dl class="log-dl">
-            <dt>本轮抓取时间</dt>
-            <dd id="log-fetch-time">{{ fetch_log.fetch_time }}</dd>
-            {% if fetch_log.duration_sec is defined %}
-            <dt>耗时（秒）</dt>
-            <dd>{{ fetch_log.duration_sec }}</dd>
-            {% endif %}
-            <dt>数据源汇总</dt>
-            <dd>{{ fetch_log.sources_summary }}</dd>
-            {% if fetch_log.total_score is defined and fetch_log.total_score is not none %}
-            <dt>本轮综合计分</dt>
-            <dd><strong>{{ fetch_log.total_score }}</strong> / 100 · {{ fetch_log.rating_label }}</dd>
-            {% endif %}
-            <dt>异常报错</dt>
-            <dd>
-                {% if fetch_log.errors %}
-                    <ul class="error-list">
-                        {% for err in fetch_log.errors %}
-                        <li>{{ err }}</li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <span class="no-error">无</span>
-                {% endif %}
-            </dd>
-        </dl>
-    </div>
-</section>
-
-<!-- 板块 D ~ F（动态权重 / 冲击 / 回测）保持原样 -->
-<section class="panel panel-d" id="panel-weights">
-    <h2 class="panel-title">板块 D · 当前动态权重</h2>
-    <p class="panel-hint status-banner" id="weight-status">{{ weight_optimizer.status_message or '动态权重每 6 小时平滑更新；突发事件 24h 内 +20%' }}</p>
-    <p class="panel-hint">
-        模式：{{ weight_optimizer.weights_method or '—' }}
-        · 下次计划：{{ weight_optimizer.next_recalc_at or '—' }}
-    </p>
+<section class="panel panel-d capsule" id="panel-weights">
+    <h2 class="panel-title">板块 D · 动态权重</h2>
+    <p class="panel-hint status-banner" id="weight-status">{{ weight_optimizer.status_message or '每 6 小时平滑更新' }}</p>
+    <p class="panel-hint">模式 {{ weight_optimizer.weights_method or '—' }} · 下次 {{ weight_optimizer.next_recalc_at or '—' }}</p>
     <div class="table-wrap">
         <table class="data-table">
-            <thead>
-                <tr>
-                    <th>模块</th>
-                    <th>当前权重</th>
-                    <th>基准 30/30/35/5</th>
-                    <th>旧版</th>
-                    <th>变化</th>
-                </tr>
-            </thead>
+            <thead><tr><th>模块</th><th>当前权重</th><th>基准</th><th>旧版</th><th>变化</th></tr></thead>
             <tbody id="weights-tbody">
                 {% if weight_optimizer.dynamic_weights %}
-                    {% for row in weight_optimizer.dynamic_weights %}
-                    <tr>
-                        <td>{{ row.name }}{% if row.event_boost %} <span class="boost-tag">突发+20%</span>{% endif %}</td>
-                        <td>
-                            <div class="weight-bar-wrap"><div class="weight-bar" style="width: {{ row.bar_percent or row.weight }}%"></div></div>
-                            <strong>{{ row.weight }}%</strong>
-                        </td>
-                        <td>{{ row.baseline_weight }}%</td>
-                        <td>{{ row.static_weight }}%</td>
-                        <td class="{% if row.delta > 0 %}impact-pos{% elif row.delta < 0 %}impact-neg{% endif %}">
-                            {% if row.delta > 0 %}+{% endif %}{{ row.delta }}
-                        </td>
-                    </tr>
-                    {% endfor %}
+                {% for row in weight_optimizer.dynamic_weights %}
+                <tr>
+                    <td>{{ row.name }}{% if row.event_boost %} <span class="boost-tag">突发+20%</span>{% endif %}</td>
+                    <td><div class="weight-bar-wrap"><div class="weight-bar" style="width:{{ row.bar_percent or row.weight }}%"></div></div><strong>{{ row.weight }}%</strong></td>
+                    <td>{{ row.baseline_weight }}%</td>
+                    <td>{{ row.static_weight }}%</td>
+                    <td class="{% if row.delta > 0 %}impact-pos{% elif row.delta < 0 %}impact-neg{% endif %}">{% if row.delta > 0 %}+{% endif %}{{ row.delta }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
-                    <tr><td colspan="5" class="empty-row">等待权重计算</td></tr>
+                <tr><td colspan="5" class="empty-row">等待权重计算</td></tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
 </section>
 
-<section class="panel panel-e" id="panel-influence">
-    <h2 class="panel-title">板块 E · 各模块真实市场冲击（24h 价格）</h2>
-    <p class="panel-hint">
-        <span class="impact-pos">绿=利多</span> · <span class="impact-neg">红=利空</span>
-        · 样本 {{ weight_optimizer.impact_samples or 0 }}/{{ weight_optimizer.impact_total or 0 }}
-    </p>
+<section class="panel panel-e capsule" id="panel-influence">
+    <h2 class="panel-title">板块 E · 市场冲击（7天/30天）</h2>
+    <p class="panel-hint"><span class="impact-pos">绿=利多</span> · <span class="impact-neg">红=利空</span> · 样本 {{ weight_optimizer.impact_samples or 0 }}/{{ weight_optimizer.impact_total or 0 }}</p>
     <div class="table-wrap">
         <table class="data-table">
-            <thead>
-                <tr><th>模块</th><th>7天冲击</th><th>7天样本</th><th>30天冲击</th><th>30天样本</th></tr>
-            </thead>
+            <thead><tr><th>模块</th><th>7天冲击</th><th>样本</th><th>30天冲击</th><th>样本</th></tr></thead>
             <tbody id="influence-tbody">
                 {% if weight_optimizer.module_influence %}
-                    {% for row in weight_optimizer.module_influence %}
-                    <tr>
-                        <td>{{ row.name }}</td>
-                        <td class="{{ row.color_7 or 'impact-neutral' }}">{% if row.signed_7 and row.signed_7 > 0 %}+{% endif %}{{ row.signed_7 | default(0) }}</td>
-                        <td>{{ row.samples_7 }}</td>
-                        <td class="{{ row.color_class or 'impact-neutral' }}">{% if row.signed and row.signed > 0 %}+{% endif %}{{ row.signed | default(0) }}</td>
-                        <td>{{ row.samples }}</td>
-                    </tr>
-                    {% endfor %}
+                {% for row in weight_optimizer.module_influence %}
+                <tr>
+                    <td>{{ row.name }}</td>
+                    <td class="{{ row.color_7 or 'impact-neutral' }}">{% if row.signed_7 and row.signed_7 > 0 %}+{% endif %}{{ row.signed_7 | default(0) }} <span class="muted">|{{ row.influence_7 }}|</span></td>
+                    <td>{{ row.samples_7 }}</td>
+                    <td class="{{ row.color_class or 'impact-neutral' }}">{% if row.signed and row.signed > 0 %}+{% endif %}{{ row.signed | default(0) }} <span class="muted">|{{ row.influence }}|</span></td>
+                    <td>{{ row.samples }}</td>
+                </tr>
+                {% endfor %}
                 {% else %}
-                    <tr><td colspan="5" class="empty-row">等待冲击样本</td></tr>
+                <tr><td colspan="5" class="empty-row">等待冲击样本</td></tr>
                 {% endif %}
             </tbody>
         </table>
     </div>
 </section>
 
-<section class="panel panel-f" id="panel-backtest">
-    <h2 class="panel-title">板块 F · 历史回测结果</h2>
+<section class="panel panel-f capsule" id="panel-backtest">
+    <h2 class="panel-title">板块 F · 历史回测</h2>
     <div class="backtest-actions">
         <button type="button" class="btn-primary" id="btn-backtest">一键回测（2025-01-01 至今）</button>
         <span class="panel-hint" id="backtest-run-status"></span>
@@ -261,25 +267,40 @@
             <dt>方向准确率</dt><dd>固定 {{ bt.fixed_accuracy }} · 动态 <strong class="impact-pos">{{ bt.dynamic_accuracy }}</strong></dd>
             <dt>BTC 相关性</dt><dd>{{ bt.fixed_correlation }} / {{ bt.dynamic_correlation }}</dd>
             <dt>最优权重</dt><dd>宏观{{ bt.optimal_weights.macro }} 监管{{ bt.optimal_weights.regulation }} 资金{{ bt.optimal_weights.funding }} 币{{ bt.optimal_weights.fundamentals }}</dd>
+            {% if bt.message %}<dt>说明</dt><dd>{{ bt.message }}</dd>{% endif %}
         </dl>
         {% else %}
         <p class="panel-hint">点击按钮运行回测，结果保存至 data/logs/</p>
         {% endif %}
     </div>
 </section>
+
+<section class="panel panel-c capsule panel-full" id="panel-log">
+    <h2 class="panel-title">板块 C · 原始数据日志</h2>
+    <div class="log-box">
+        <dl class="log-dl">
+            <dt>本轮抓取</dt><dd id="log-fetch-time">{{ fetch_log.fetch_time }}</dd>
+            {% if fetch_log.duration_sec is defined %}<dt>耗时</dt><dd>{{ fetch_log.duration_sec }} 秒</dd>{% endif %}
+            <dt>数据源汇总</dt><dd>{{ fetch_log.sources_summary }}</dd>
+            {% if fetch_log.total_score is defined and fetch_log.total_score is not none %}
+            <dt>本轮计分</dt><dd><strong>{{ fetch_log.total_score }}</strong> · {{ fetch_log.rating_label }}</dd>
+            {% endif %}
+            <dt>异常</dt>
+            <dd>{% if fetch_log.errors %}<ul class="error-list">{% for err in fetch_log.errors %}<li>{{ err }}</li>{% endfor %}</ul>{% else %}<span class="no-error">无</span>{% endif %}</dd>
+        </dl>
+    </div>
+</section>
+
+</div>
 {% endblock %}
 
 {% block footer_extra %}
-<footer class="site-footer usage-guide">
-    <h3 class="guide-title">极简使用说明</h3>
+<footer class="site-footer usage-guide capsule">
+    <h3 class="guide-title">使用说明</h3>
     <ol class="guide-list">
-        <li><strong>启动</strong>：<code>venv\Scripts\activate</code> → <code>python main.py</code></li>
-        <li><strong>停止</strong>：终端 <code>Ctrl+C</code></li>
-        <li><strong>看页面</strong>：<code>http://127.0.0.1:5000</code></li>
-        <li><strong>手机访问</strong>：<code>web.host: 0.0.0.0</code> 后使用局域网 IP</li>
-        <li><strong>回测</strong>：板块 F 一键回测按钮</li>
-        <li><strong>自动刷新</strong>：价格每 <strong>{{ price_refresh_seconds | default(5) }}</strong> 秒 · 行情/资讯/评分每 <strong>{{ dashboard_refresh_seconds | default(30) }}</strong> 秒 · 后台抓取仍每 10 分钟</li>
-        <li><strong>权重更新</strong>：每 {{ recalc_interval_hours | default(6) }} 小时自动重算</li>
+        <li>顶部三币价格每 {{ price_refresh_seconds | default(5) }} 秒刷新</li>
+        <li>中央圆盘 = 悬浮球同款晴雨表</li>
+        <li>资讯区自动滚动播报，下方可查看完整表格</li>
     </ol>
 </footer>
 {% endblock %}

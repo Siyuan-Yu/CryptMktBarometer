@@ -1,18 +1,20 @@
 """
-桌面悬浮晴雨表小球（tkinter · 萤火虫可爱风）
+桌面悬浮晴雨球 — 纯圆形 Q 版萤火虫仪表盘（tkinter Canvas）
 
-分区交互：
-  - 上半区：仅拖动
-  - 中间文字区：无点击动作；双击展开/收起
-  - 右下角「↗」按钮：打开网页
-  - 右键：打开网页 / 隐藏悬浮球 / 退出悬浮球
+分区交互（严格）：
+  · 上半圆：拖动
+  · 下半圆：单击 → 打开网页
+  · 任意处双击：展开/收起（展开时在圆下方显示迷你价格条）
+  · 右键：菜单（打开网页 / 隐藏 / 退出悬浮球）
 """
 
 from __future__ import annotations
 
 import logging
+import math
 import sys
 import threading
+import time
 import webbrowser
 from pathlib import Path
 from typing import Any
@@ -24,33 +26,25 @@ _root: Any = None
 _thread: threading.Thread | None = None
 _running = False
 _hidden = False
-_expanded = True
+_expanded = False
+_diameter = 168
+_canvas: Any = None
 _price_job: str | None = None
 _dash_job: str | None = None
 
 _FONT = ("Microsoft YaHei UI",)
-_FONT_BOLD = ("Microsoft YaHei UI",)
 
-# 评级主题（背景 / 主色 / 文字）
-_RATING_THEMES: dict[str, dict[str, str]] = {
-    "强利多": {"bg": "#e8faf3", "accent": "#5ecf9a", "fg": "#2d7a5a", "sub": "#6bb896"},
-    "利多": {"bg": "#e8f8fc", "accent": "#6dd4e8", "fg": "#3a7a8a", "sub": "#7ab0bc"},
-    "偏利多": {"bg": "#e8f8fc", "accent": "#6dd4e8", "fg": "#3a7a8a", "sub": "#7ab0bc"},
-    "中性": {"bg": "#f6f2fc", "accent": "#c4b8e8", "fg": "#6a6288", "sub": "#9a94b0"},
-    "利空": {"bg": "#fff6ee", "accent": "#ffc896", "fg": "#9a7048", "sub": "#b8a080"},
-    "偏利空": {"bg": "#fff6ee", "accent": "#ffc896", "fg": "#9a7048", "sub": "#b8a080"},
-    "强利空": {"bg": "#fff0f2", "accent": "#ffb0b8", "fg": "#a85a62", "sub": "#c09098"},
-    "待计算": {"bg": "#f4f7fc", "accent": "#a8c8e8", "fg": "#6a8098", "sub": "#9ab0c8"},
-    "连接中…": {"bg": "#f4f7fc", "accent": "#a8c8e8", "fg": "#6a8098", "sub": "#9ab0c8"},
-    "等待服务…": {"bg": "#f4f7fc", "accent": "#a8c8e8", "fg": "#6a8098", "sub": "#9ab0c8"},
+# 评级 → 外圈色
+_RING: dict[str, tuple[str, str, str]] = {
+    "强利多": ("#b8f5d4", "#5ecf9a", "#2d7a5a"),
+    "利多": ("#c8f5f0", "#6dd4c8", "#3a7a8a"),
+    "偏利多": ("#c8f5f0", "#6dd4c8", "#3a7a8a"),
+    "中性": ("#ece8f8", "#c4b8e8", "#6a6288"),
+    "利空": ("#fff0e0", "#ffc896", "#9a7048"),
+    "偏利空": ("#fff0e0", "#ffc896", "#9a7048"),
+    "强利空": ("#ffe8ec", "#ffabab", "#a85a62"),
+    "待计算": ("#eef4fc", "#a8c8e8", "#6a8098"),
 }
-
-_CHG_UP = "#4ecf9a"
-_CHG_DOWN = "#ff9b9b"
-_CHG_FLAT = "#a8b4c8"
-
-_GEO_EXPANDED = "228x300"
-_GEO_COLLAPSED = "200x132"
 
 
 def _display_rating(label: str) -> str:
@@ -92,271 +86,228 @@ def _http_get(path: str, timeout: float = 4.0) -> dict[str, Any] | None:
         return None
 
 
-def _fmt_price(v: float | None) -> str:
-    if v is None:
-        return "—"
-    if v >= 1000:
-        return f"${v:,.0f}"
-    if v >= 1:
-        return f"${v:,.2f}"
-    return f"${v:.3f}"
-
-
-def _fmt_chg(pct: float | None) -> tuple[str, str]:
-    if pct is None:
-        return "—", _CHG_FLAT
-    sign = "+" if pct >= 0 else ""
-    text = f"{sign}{pct:.1f}%"
-    if pct > 0.05:
-        return text, _CHG_UP
-    if pct < -0.05:
-        return text, _CHG_DOWN
-    return text, _CHG_FLAT
+def _theme(rating_key: str) -> tuple[str, str, str]:
+    show = _display_rating(rating_key)
+    return _RING.get(show, _RING.get(rating_key, _RING["待计算"]))
 
 
 def _run_ui() -> None:
-    global _root, _running, _price_job, _dash_job, _expanded, _hidden
+    global _root, _running, _hidden, _expanded, _canvas, _price_job, _dash_job
 
     import tkinter as tk
     from tkinter import Menu
 
     _running = True
     _hidden = False
-    _expanded = True
+    _expanded = False
 
-    theme = _RATING_THEMES["待计算"]
-    bg = theme["bg"]
+    d = _diameter
+    pad = 8
+    win_h = d + pad * 2
+    win_w = d + pad * 2
+
+    state = {
+        "score": None,
+        "rating": "连接中",
+        "theme": _theme("待计算"),
+        "prices": {},
+        "drag": False,
+        "press_y": 0,
+        "press_x": 0,
+        "moved": False,
+        "last_click": 0.0,
+    }
 
     _root = tk.Tk()
-    _root.title("晴雨小球")
+    _root.title("晴雨球")
     _root.overrideredirect(True)
     _root.attributes("-topmost", True)
     try:
-        _root.attributes("-alpha", 0.92)
+        _root.attributes("-alpha", 0.94)
+        _root.attributes("-transparentcolor", "#010101")
     except tk.TclError:
         pass
-    _root.configure(bg=bg)
-    _root.geometry(f"{_GEO_EXPANDED}+100+100")
+    _root.configure(bg="#010101")
+    _root.geometry(f"{win_w}x{win_h}+120+120")
 
-    # 拖动状态（仅上半区启动）
-    _drag = {"active": False, "ox": 0, "oy": 0, "sx": 0, "sy": 0}
-
-    def _in_top_half(ev: tk.Event) -> bool:
-        wy = ev.y_root - _root.winfo_rooty()
-        h = max(_root.winfo_height(), 1)
-        return wy < h * 0.52
-
-    def _start_drag(ev: tk.Event) -> None:
-        if not _in_top_half(ev):
-            return
-        _drag["active"] = True
-        _drag["sx"] = ev.x_root
-        _drag["sy"] = ev.y_root
-        _drag["ox"] = ev.x_root - _root.winfo_x()
-        _drag["oy"] = ev.y_root - _root.winfo_y()
-
-    def _window_size() -> tuple[int, int]:
-        return (228, 300) if _expanded else (200, 132)
-
-    def _do_drag(ev: tk.Event) -> None:
-        if not _drag["active"]:
-            return
-        x = ev.x_root - _drag["ox"]
-        y = ev.y_root - _drag["oy"]
-        w, h = _window_size()
-        _root.geometry(f"{w}x{h}+{x}+{y}")
-
-    def _end_drag(_ev: tk.Event) -> None:
-        _drag["active"] = False
-
-    # --- 外层椭圆卡片容器 ---
-    outer = tk.Frame(_root, bg=bg, padx=14, pady=12)
-    outer.pack(fill=tk.BOTH, expand=True)
-
-    # 顶部拖动条（上半区）
-    drag_strip = tk.Frame(outer, bg=bg, height=36, cursor="fleur")
-    drag_strip.pack(fill=tk.X)
-    drag_strip.pack_propagate(False)
-    drag_hint = tk.Label(
-        drag_strip,
-        text="☁  拖动我",
-        font=(_FONT[0], 8),
-        fg=theme["sub"],
-        bg=bg,
-        cursor="fleur",
-    )
-    drag_hint.place(relx=0.5, rely=0.5, anchor="center")
-
-    # 中间：分数 + 评级
-    content = tk.Frame(outer, bg=bg)
-    content.pack(fill=tk.X, pady=(2, 4))
-
-    score_lbl = tk.Label(
-        content,
-        text="—",
-        font=(_FONT[0], 32, "bold"),
-        fg=theme["fg"],
-        bg=bg,
-        cursor="arrow",
-    )
-    score_lbl.pack()
-
-    rating_lbl = tk.Label(
-        content,
-        text="连接中",
-        font=(_FONT[0], 12, "bold"),
-        fg=theme["accent"],
-        bg=bg,
-        cursor="arrow",
-    )
-    rating_lbl.pack(pady=(0, 2))
-
-    collapse_hint = tk.Label(
-        content,
-        text="双击收起",
-        font=(_FONT[0], 7),
-        fg=theme["sub"],
-        bg=bg,
-    )
-    collapse_hint.pack()
-
-    # 底部价格区
-    price_zone = tk.Frame(outer, bg=bg)
-    price_zone.pack(fill=tk.X, pady=(6, 0))
-
-    price_labels: dict[str, tuple[tk.Label, tk.Label]] = {}
-    for sym in ("BTC", "ETH", "SOL"):
-        row = tk.Frame(price_zone, bg=bg)
-        row.pack(fill=tk.X, pady=2)
-        tk.Label(
-            row,
-            text=sym,
-            font=(_FONT[0], 8, "bold"),
-            fg=theme["accent"],
-            bg=bg,
-            width=4,
-            anchor="w",
-        ).pack(side=tk.LEFT)
-        px = tk.Label(row, text="—", font=(_FONT[0], 8), fg=theme["fg"], bg=bg, anchor="w")
-        px.pack(side=tk.LEFT, expand=True, fill=tk.X)
-        ch = tk.Label(row, text="", font=(_FONT[0], 8), fg=_CHG_FLAT, bg=bg, width=7, anchor="e")
-        ch.pack(side=tk.RIGHT)
-        price_labels[sym] = (px, ch)
-
-    status_lbl = tk.Label(
-        price_zone,
-        text="",
-        font=(_FONT[0], 7),
-        fg=theme["sub"],
-        bg=bg,
-    )
-    status_lbl.pack(pady=(4, 0))
-
-    # 右下角打开网页按钮
-    btn_frame = tk.Frame(outer, bg=bg)
-    btn_frame.pack(fill=tk.X, pady=(8, 0))
-
-    open_canvas = tk.Canvas(
-        btn_frame,
-        width=44,
-        height=44,
-        bg=bg,
+    _canvas = tk.Canvas(
+        _root,
+        width=win_w,
+        height=win_h,
+        bg="#010101",
         highlightthickness=0,
-        cursor="hand2",
+        bd=0,
     )
-    open_canvas.pack(side=tk.RIGHT)
+    _canvas.pack()
 
-    def _draw_open_btn(accent: str) -> None:
-        open_canvas.delete("all")
-        open_canvas.create_oval(2, 2, 42, 42, fill=accent, outline="#ffffff", width=2)
-        open_canvas.create_text(22, 22, text="↗", fill="#ffffff", font=(_FONT[0], 14, "bold"))
+    cx = win_w // 2
+    cy = pad + d // 2
+    r_outer = d // 2 - 4
+    r_ring = r_outer - 10
+    r_inner = r_outer - 22
 
-    _draw_open_btn(theme["accent"])
-    open_canvas.bind("<Button-1>", lambda _e: _open_web_panel())
+    def _resize_window() -> None:
+        nonlocal win_h, win_w
+        extra = 72 if _expanded else 0
+        win_h = d + pad * 2 + extra
+        win_w = d + pad * 2
+        _root.geometry(f"{win_w}x{win_h}+{_root.winfo_x()}+{_root.winfo_y()}")
+        _canvas.config(width=win_w, height=win_h)
 
-    _widgets_all: list[tk.Widget] = [
-        outer,
-        drag_strip,
-        drag_hint,
-        content,
-        score_lbl,
-        rating_lbl,
-        collapse_hint,
-        price_zone,
-        status_lbl,
-        btn_frame,
-    ]
+    def _local_y(ev: tk.Event) -> float:
+        return ev.y - pad
 
-    def _apply_theme(rating_key: str) -> None:
-        t = _RATING_THEMES.get(rating_key, _RATING_THEMES["中性"])
-        nb = t["bg"]
-        _root.configure(bg=nb)
-        for w in _widgets_all:
-            try:
-                w.configure(bg=nb)
-            except tk.TclError:
-                pass
-        for sym_row in price_zone.winfo_children():
-            if isinstance(sym_row, tk.Frame):
-                sym_row.configure(bg=nb)
-                for c in sym_row.winfo_children():
-                    c.configure(bg=nb)
-        score_lbl.configure(fg=t["fg"])
-        rating_lbl.configure(fg=t["accent"])
-        drag_hint.configure(fg=t["sub"])
-        collapse_hint.configure(fg=t["sub"])
-        status_lbl.configure(fg=t["sub"])
-        _draw_open_btn(t["accent"])
+    def _in_upper_half(ev: tk.Event) -> bool:
+        ly = _local_y(ev)
+        return ly < d / 2 and math.hypot(ev.x - cx, ly - (d / 2)) <= r_outer + 6
 
-    def _bind_drag_only(widget: tk.Widget) -> None:
-        widget.bind("<Button-1>", _start_drag)
-        widget.bind("<B1-Motion>", _do_drag)
-        widget.bind("<ButtonRelease-1>", _end_drag)
+    def _in_lower_half(ev: tk.Event) -> bool:
+        ly = _local_y(ev)
+        return ly >= d / 2 and math.hypot(ev.x - cx, ly - (d / 2)) <= r_outer + 6
 
-    _bind_drag_only(drag_strip)
-    _bind_drag_only(drag_hint)
+    def _draw() -> None:
+        if not _canvas or not _running:
+            return
+        _canvas.delete("all")
+        bg_outer, ring_c, fg = state["theme"]
+        score = state["score"]
+        rating = _display_rating(state["rating"])
 
-    def _toggle_expand(_ev: tk.Event | None = None) -> None:
+        # 透明底
+        _canvas.create_rectangle(0, 0, win_w, win_h, fill="#010101", outline="")
+
+        # 外发光
+        for i in range(3, 0, -1):
+            _canvas.create_oval(
+                cx - r_outer - i * 3,
+                cy - r_outer - i * 3,
+                cx + r_outer + i * 3,
+                cy + r_outer + i * 3,
+                fill="",
+                outline=ring_c,
+                width=1,
+            )
+
+        # 五色状态环（静态装饰弧）
+        seg_colors = ["#5ecf9a", "#6dd4c8", "#c4b8e8", "#ffc896", "#ffabab"]
+        for i, col in enumerate(seg_colors):
+            start = -90 + i * 72
+            _canvas.create_arc(
+                cx - r_outer,
+                cy - r_outer,
+                cx + r_outer,
+                cy + r_outer,
+                start=start,
+                extent=50,
+                style=tk.ARC,
+                outline=col,
+                width=6,
+            )
+
+        # 分数进度环
+        pct = (float(score) / 100.0) if score is not None else 0
+        extent = max(4, min(360, pct * 3.6))
+        _canvas.create_arc(
+            cx - r_ring,
+            cy - r_ring,
+            cx + r_ring,
+            cy + r_ring,
+            start=-90,
+            extent=extent,
+            style=tk.ARC,
+            outline=ring_c,
+            width=8,
+        )
+
+        # 磨砂内圆
+        _canvas.create_oval(
+            cx - r_inner,
+            cy - r_inner,
+            cx + r_inner,
+            cy + r_inner,
+            fill=bg_outer,
+            outline="#ffffff",
+            width=2,
+        )
+
+        # 中心分数
+        sc = "—" if score is None else f"{int(round(float(score)))}"
+        _canvas.create_text(cx, cy - 10, text=sc, fill=fg, font=(_FONT[0], 26, "bold"))
+        _canvas.create_text(cx, cy + 18, text=rating, fill=ring_c, font=(_FONT[0], 10, "bold"))
+
+        # 下半区提示（小字）
+        _canvas.create_text(
+            cx,
+            cy + r_inner - 8,
+            text="↓ 点开网页",
+            fill="#9ab0c8",
+            font=(_FONT[0], 7),
+        )
+
+        # 展开：圆下方迷你价格
+        if _expanded and state["prices"]:
+            y0 = pad + d + 6
+            _canvas.create_rectangle(
+                12,
+                y0,
+                win_w - 12,
+                win_h - 8,
+                fill="#f8fbff",
+                outline="#dce8f8",
+                width=1,
+            )
+            line = " · ".join(
+                f"{k} {_short_price(v)}" for k, v in state["prices"].items()
+            )
+            _canvas.create_text(
+                win_w // 2,
+                y0 + 28,
+                text=line[:42],
+                fill="#6a8098",
+                font=(_FONT[0], 8),
+            )
+
+    def _short_price(t: dict) -> str:
+        p = t.get("price")
+        if p is None:
+            return "—"
+        if p >= 1000:
+            return f"${p:,.0f}"
+        return f"${p:.1f}"
+
+    def _on_press(ev: tk.Event) -> None:
+        state["drag"] = _in_upper_half(ev)
+        state["press_x"] = ev.x_root
+        state["press_y"] = ev.y_root
+        state["moved"] = False
+        state["ox"] = ev.x_root - _root.winfo_x()
+        state["oy"] = ev.y_root - _root.winfo_y()
+
+    def _on_motion(ev: tk.Event) -> None:
+        if state["drag"]:
+            if abs(ev.x_root - state["press_x"]) > 3 or abs(ev.y_root - state["press_y"]) > 3:
+                state["moved"] = True
+            _root.geometry(
+                f"{win_w}x{win_h}+{ev.x_root - state['ox']}+{ev.y_root - state['oy']}"
+            )
+
+    def _on_release(ev: tk.Event) -> None:
+        if state["drag"]:
+            state["drag"] = False
+            return
+        if _in_lower_half(ev) and not state["moved"]:
+            now = time.time()
+            if now - state["last_click"] < 0.35:
+                return
+            state["last_click"] = now
+            _open_web_panel()
+
+    def _on_double(_ev: tk.Event) -> None:
         global _expanded
         _expanded = not _expanded
-        x, y = _root.winfo_x(), _root.winfo_y()
-        if _expanded:
-            price_zone.pack(fill=tk.X, pady=(6, 0))
-            btn_frame.pack(fill=tk.X, pady=(8, 0))
-            collapse_hint.config(text="双击收起")
-            _root.geometry(f"{_GEO_EXPANDED}+{x}+{y}")
-        else:
-            price_zone.pack_forget()
-            btn_frame.pack_forget()
-            collapse_hint.config(text="双击展开")
-            _root.geometry(f"{_GEO_COLLAPSED}+{x}+{y}")
-
-    content.bind("<Double-Button-1>", _toggle_expand)
-    score_lbl.bind("<Double-Button-1>", _toggle_expand)
-    rating_lbl.bind("<Double-Button-1>", _toggle_expand)
-
-    # 根窗口：仅上半区可拖动
-    def _root_press(ev: tk.Event) -> None:
-        w = ev.widget
-        if w == open_canvas or str(w).endswith("canvas"):
-            return
-        # 右下角按钮区域不触发拖动
-        wx = ev.x_root - _root.winfo_rootx()
-        wy = ev.y_root - _root.winfo_rooty()
-        rw, rh = _root.winfo_width(), _root.winfo_height()
-        if wx > rw - 52 and wy > rh - 52:
-            return
-        _start_drag(ev)
-
-    def _root_drag(ev: tk.Event) -> None:
-        _do_drag(ev)
-
-    def _root_release(ev: tk.Event) -> None:
-        _end_drag(ev)
-
-    _root.bind("<Button-1>", _root_press)
-    _root.bind("<B1-Motion>", _root_drag)
-    _root.bind("<ButtonRelease-1>", _root_release)
+        state["last_click"] = time.time() + 0.5
+        _resize_window()
+        _draw()
 
     def _hide_ball() -> None:
         global _hidden
@@ -370,32 +321,32 @@ def _run_ui() -> None:
         if _root:
             _root.destroy()
 
-    menu = Menu(_root, tearoff=0, font=(_FONT[0], 9))
+    menu = Menu(_root, tearoff=0)
     menu.add_command(label="打开网页", command=_open_web_panel)
     menu.add_command(label="隐藏悬浮球", command=_hide_ball)
     menu.add_separator()
     menu.add_command(label="退出悬浮球", command=_close_floating_only)
 
-    def _on_right_click(ev: tk.Event) -> None:
+    def _on_right(ev: tk.Event) -> None:
         menu.tk_popup(ev.x_root, ev.y_root)
 
-    _root.bind("<Button-3>", _on_right_click)
-    outer.bind("<Button-3>", _on_right_click)
+    _canvas.bind("<Button-1>", _on_press)
+    _canvas.bind("<B1-Motion>", _on_motion)
+    _canvas.bind("<ButtonRelease-1>", _on_release)
+    _canvas.bind("<Double-Button-1>", _on_double)
+    _canvas.bind("<Button-3>", _on_right)
 
     def _refresh_prices() -> None:
         global _price_job
         if not _running or not _root:
             return
-        if not _expanded:
-            _price_job = _root.after(5000, _refresh_prices)
-            return
         data = _http_get("/api/prices")
         if data and data.get("tickers"):
-            for sym, (px_lbl, chg_lbl) in price_labels.items():
-                t = data["tickers"].get(sym) or {}
-                px_lbl.config(text=_fmt_price(t.get("price")))
-                chg_text, chg_color = _fmt_chg(t.get("change_24h_pct"))
-                chg_lbl.config(text=chg_text, fg=chg_color)
+            state["prices"] = {
+                s: data["tickers"].get(s, {}) for s in ("BTC", "ETH", "SOL")
+            }
+            if _expanded:
+                _draw()
         _price_job = _root.after(5000, _refresh_prices)
 
     def _refresh_dashboard() -> None:
@@ -404,37 +355,26 @@ def _run_ui() -> None:
             return
         data = _http_get("/api/dashboard")
         if data:
-            total = data.get("total_score")
-            rating = data.get("rating_label") or "待计算"
-            show = _display_rating(rating)
-            if total is not None:
-                score_lbl.config(text=f"{float(total):.0f}")
-            else:
-                score_lbl.config(text="—")
-            rating_lbl.config(text=show)
-            _apply_theme(show if show in _RATING_THEMES else rating)
+            state["score"] = data.get("total_score")
+            state["rating"] = data.get("rating_label") or "待计算"
+            state["theme"] = _theme(state["rating"])
         else:
-            score_lbl.config(text="—")
-            rating_lbl.config(text="等待")
-            _apply_theme("等待服务…")
+            state["score"] = None
+            state["rating"] = "等待"
+            state["theme"] = _theme("待计算")
+        _draw()
         _dash_job = _root.after(30000, _refresh_dashboard)
 
+    _draw()
     _refresh_prices()
     _refresh_dashboard()
-
-    def _on_destroy() -> None:
-        global _running, _root
-        _running = False
-        _root = None
-
-    _root.protocol("WM_DELETE_WINDOW", _close_floating_only)
-    _root.bind("<Destroy>", lambda _e: _on_destroy())
 
     try:
         _root.mainloop()
     finally:
         _running = False
         _root = None
+        _canvas = None
 
 
 def start_floating_window(base_url: str | None = None) -> None:
@@ -448,13 +388,12 @@ def start_floating_window(base_url: str | None = None) -> None:
             pass
     stop_floating_window()
     _base_url = _resolve_base_url(base_url)
-    _thread = threading.Thread(target=_run_ui, name="FloatingDashboard", daemon=True)
+    _thread = threading.Thread(target=_run_ui, name="FloatingBall", daemon=True)
     _thread.start()
-    logger.info("悬浮晴雨球已启动，API=%s", _base_url)
+    logger.info("悬浮晴雨球已启动 %s", _base_url)
 
 
 def show_floating_window() -> None:
-    """显示已隐藏的悬浮球。"""
     global _hidden
     if _root is not None:
         try:
@@ -466,7 +405,6 @@ def show_floating_window() -> None:
 
 
 def hide_floating_window() -> None:
-    """隐藏悬浮球（不停止 Flask）。"""
     global _hidden
     if _root is not None:
         try:
@@ -487,7 +425,7 @@ def stop_floating_window() -> None:
             def _destroy() -> None:
                 try:
                     r.destroy()
-                except tk.TclError:
+                except Exception:
                     pass
 
             r.after(0, _destroy)
@@ -498,11 +436,9 @@ def stop_floating_window() -> None:
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
-    import time
-
     base = _resolve_base_url()
-    print(f"悬浮球连接: {base}")
-    print("上半区拖动 · 中间双击展开/收起 · 右下角↗打开网页 · 右键菜单")
+    print("悬浮球:", base)
+    print("上半圆拖动 · 下半圆点开网页 · 双击展开价格")
 
     for _ in range(30):
         if _http_get("/health"):

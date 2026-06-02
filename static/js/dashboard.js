@@ -54,12 +54,129 @@
         el.textContent = `${h}时${m}分${s}秒`;
     }
 
+    window.__topNewsList = [];
+    window.__newsTables = {};
+
+    function tagClass(label) {
+        const map = {
+            "SOL生态": "tag-sol",
+            "ETH生态": "tag-eth",
+            美股宏观: "tag-macro",
+            全市场加密: "tag-crypto",
+        };
+        return map[label] || "tag-crypto";
+    }
+
+    function keywordPillsHtml(item) {
+        const kws =
+            item.keywords_cn ||
+            item.display_keywords ||
+            item.keywords ||
+            [];
+        if (!kws.length) return '<span class="muted">—</span>';
+        return `<div class="kw-pills">${kws
+            .map((k) => `<span class="kw-pill">${esc(k)}</span>`)
+            .join("")}</div>`;
+    }
+
+    function tickerChipHtml(item, rank) {
+        const score = Number(item.impact_score) || 0;
+        const ic =
+            score > 0 ? "impact-pos" : score < 0 ? "impact-neg" : "";
+        const title =
+            item.title_cn || item.display_title || item.title || "—";
+        const label =
+            item.category_label || item.source_tag || "全市场加密";
+        const sign = score > 0 ? "+" : "";
+        return `<button type="button" class="ticker-chip" data-news-open="${rank - 1}" aria-label="查看资讯详情">
+        <span class="cat-tag ${tagClass(label)}">${esc(label)}</span>
+        <span class="ticker-chip-rank">#${rank}</span>
+        <span class="ticker-chip-title">${esc(title)}</span>
+        <span class="ticker-chip-score ${ic}">${sign}${score}分</span>
+      </button>`;
+    }
+
+    function openNewsModal(item) {
+        if (!item) return;
+        const modal = $("news-modal");
+        if (!modal) return;
+        const label =
+            item.category_label || item.source_tag || "全市场加密";
+        const score = Number(item.impact_score) || 0;
+        const sign = score > 0 ? "+" : "";
+        const tagEl = $("news-modal-tag");
+        const titleEl = $("news-modal-title");
+        const sumEl = $("news-modal-summary");
+        const kwEl = $("news-modal-keywords");
+        const scoreEl = $("news-modal-score");
+        const srcEl = $("news-modal-source");
+        const linkEl = $("news-modal-link");
+
+        if (tagEl) {
+            tagEl.textContent = label;
+            tagEl.className = `cat-tag ${tagClass(label)}`;
+        }
+        if (titleEl)
+            titleEl.textContent =
+                item.title_cn || item.display_title || item.title || "—";
+        if (sumEl) sumEl.textContent = item.summary_cn || "暂无摘要";
+        if (kwEl) kwEl.innerHTML = keywordPillsHtml(item);
+        if (scoreEl) {
+            scoreEl.textContent = `${sign}${score} 分`;
+            scoreEl.className =
+                score > 0
+                    ? "impact-pos"
+                    : score < 0
+                      ? "impact-neg"
+                      : "";
+        }
+        if (srcEl) srcEl.textContent = item.source || "—";
+        if (linkEl) {
+            if (item.url) {
+                linkEl.innerHTML = `<a href="${esc(item.url)}" target="_blank" rel="noopener">${esc(item.url)}</a>`;
+            } else {
+                linkEl.textContent = "—";
+            }
+        }
+        modal.hidden = false;
+        modal.setAttribute("aria-hidden", "false");
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeNewsModal() {
+        const modal = $("news-modal");
+        if (!modal) return;
+        modal.hidden = true;
+        modal.setAttribute("aria-hidden", "true");
+        document.body.style.overflow = "";
+    }
+
+    function renderNewsTicker(items) {
+        const track = $("news-ticker-track");
+        if (!track) return;
+        window.__topNewsList = items || [];
+
+        if (!items || !items.length) {
+            track.innerHTML =
+                '<span class="ticker-chip ticker-chip-empty">等待定时任务抓取 TOP10 资讯…</span>';
+            return;
+        }
+
+        const chips = items.map((item, i) => tickerChipHtml(item, i + 1)).join("");
+        track.innerHTML = chips + chips;
+        const duration = Math.max(40, items.length * 6);
+        track.style.animationDuration = `${duration}s`;
+    }
+
     function renderNewsTable(tbodyId, items) {
         const tbody = $(tbodyId);
         if (!tbody) return;
+        window.__newsTables = window.__newsTables || {};
+        window.__newsTables[tbodyId] = items || [];
+
         if (!items || !items.length) {
             tbody.innerHTML =
-                '<tr><td colspan="7" class="empty-row">暂无该类资讯</td></tr>';
+                '<tr><td colspan="5" class="empty-row">暂无该类资讯</td></tr>';
             return;
         }
         tbody.innerHTML = items
@@ -67,12 +184,6 @@
                 const score = Number(item.impact_score) || 0;
                 const ic =
                     score > 0 ? "impact-pos" : score < 0 ? "impact-neg" : "";
-                const kw = (
-                    item.keywords_cn ||
-                    item.display_keywords ||
-                    item.keywords ||
-                    []
-                ).join(" · ");
                 const title =
                     item.title_cn ||
                     item.display_title ||
@@ -80,20 +191,121 @@
                     "";
                 const summary = item.summary_cn || "—";
                 const link = item.url
-                    ? `<a href="${esc(item.url)}" target="_blank" rel="noopener">查看</a>`
-                    : "—";
+                    ? `<a href="${esc(item.url)}" target="_blank" rel="noopener" class="meta-link" onclick="event.stopPropagation()">原文</a>`
+                    : "";
                 const sign = score > 0 ? "+" : "";
-                return `<tr>
-          <td>${i + 1}</td>
+                return `<tr class="news-row-clickable" data-news-table="${esc(tbodyId)}" data-news-index="${i}" tabindex="0" role="button">
+          <td class="col-idx">${i + 1}</td>
           <td class="title-cell">${esc(title)}</td>
-          <td class="summary-cell">${esc(summary)}</td>
-          <td class="keywords-cell">${esc(kw || "—")}</td>
-          <td class="impact-cell ${ic}">${sign}${score}</td>
-          <td>${esc(item.source || "")}</td>
-          <td>${link}</td>
+          <td class="summary-cell"><div class="cell-scroll">${esc(summary)}</div></td>
+          <td class="keywords-cell">${keywordPillsHtml(item)}</td>
+          <td class="meta-cell"><div class="cell-scroll meta-stack">
+            <span class="impact-cell ${ic}">${sign}${score}</span>
+            <span class="meta-source">${esc(item.source || "")}</span>
+            ${link}
+          </div></td>
         </tr>`;
             })
             .join("");
+    }
+
+    function renderWeightScoreStrip(categories, dynamicWeights) {
+        const strip = $("weight-score-strip");
+        if (!strip) return;
+        const weightMap = {};
+        (dynamicWeights || []).forEach((r) => {
+            if (r.name) weightMap[r.name] = r.weight;
+        });
+        strip.querySelectorAll(".wsc-card").forEach((card, i) => {
+            const cat = (categories || [])[i];
+            if (!cat) return;
+            const wEl = card.querySelector("[data-wsc-weight]");
+            const sEl = card.querySelector("[data-wsc-score]");
+            const w = weightMap[cat.name];
+            if (wEl)
+                wEl.textContent =
+                    w != null ? `${w}%` : cat.weight != null ? `${cat.weight}%` : "—";
+            if (sEl)
+                sEl.textContent =
+                    cat.score != null ? Number(cat.score).toFixed(1) : "—";
+        });
+    }
+
+    const RING_LEN = 1017.88;
+
+    function ratingToState(label, score) {
+        const s = Number(score);
+        if (!Number.isNaN(s)) {
+            if (s > 70) return "bull-strong";
+            if (s >= 55) return "bull";
+            if (s >= 45) return "neutral";
+            if (s >= 30) return "bear";
+            return "bear-strong";
+        }
+        const map = {
+            强利多: "bull-strong",
+            偏利多: "bull",
+            利多: "bull",
+            中性: "neutral",
+            偏利空: "bear",
+            利空: "bear",
+            强利空: "bear-strong",
+        };
+        return map[label] || "neutral";
+    }
+
+    function scoreGradient(score) {
+        const s = Number(score);
+        if (Number.isNaN(s)) return ["#a8d8ff", "#c4b0ff", "#ffb8d8"];
+        if (s > 70) return ["#8ef0c0", "#5ecf9a", "#a8ffe0"];
+        if (s >= 55) return ["#a8f0e8", "#6dd4c8", "#c8fff0"];
+        if (s >= 45) return ["#e8e0ff", "#c4b8e8", "#f0ecff"];
+        if (s >= 30) return ["#ffe8c8", "#ffc896", "#fff0d8"];
+        return ["#ffd8dc", "#ffabab", "#ffe8ec"];
+    }
+
+    function renderCentralGauge(totalScore, ratingLabel, ratingClass) {
+        const gauge = $("firefly-gauge");
+        const scoreEl = $("gauge-score");
+        const ratingEl = $("gauge-rating");
+        const ring = $("gauge-ring-progress");
+        if (!gauge) return;
+
+        const score =
+            totalScore != null && !Number.isNaN(Number(totalScore))
+                ? Number(totalScore)
+                : null;
+        const label = ratingLabel || "待计算";
+        const state = ratingToState(label, score);
+
+        gauge.dataset.activeState = state;
+        gauge.dataset.ratingClass = ratingClass || "rating-neutral";
+        gauge.style.setProperty(
+            "--score-pct",
+            score != null ? String(score / 100) : "0"
+        );
+
+        if (scoreEl) {
+            scoreEl.textContent =
+                score != null ? String(Math.round(score)) : "—";
+        }
+        if (ratingEl) {
+            ratingEl.textContent = label;
+            ratingEl.className = `gauge-rating ${ratingClass || "rating-neutral"}`;
+        }
+        if (ring) {
+            const pct = score != null ? Math.min(100, Math.max(0, score)) : 0;
+            ring.style.strokeDashoffset = String(
+                RING_LEN * (1 - pct / 100)
+            );
+            const [a, b, c] = scoreGradient(score);
+            const sa = $("grad-stop-a");
+            const sb = $("grad-stop-b");
+            const sc = $("grad-stop-c");
+            if (sa) sa.setAttribute("stop-color", a);
+            if (sb) sb.setAttribute("stop-color", b);
+            if (sc) sc.setAttribute("stop-color", c);
+        }
     }
 
     function renderPrices(data) {
@@ -113,12 +325,12 @@
             if (chgEl) {
                 if (chg == null) {
                     chgEl.textContent = "24h —";
-                    chgEl.className = "price-change";
+                    chgEl.className = "price-hero-chg";
                 } else {
                     const sign = chg >= 0 ? "+" : "";
                     chgEl.textContent = `24h ${sign}${Number(chg).toFixed(2)}%`;
                     chgEl.className =
-                        "price-change " + (chg >= 0 ? "chg-up" : "chg-down");
+                        "price-hero-chg " + (chg >= 0 ? "chg-up" : "chg-down");
                 }
             }
         });
@@ -197,10 +409,12 @@
         }
         const ow = bt.optimal_weights || {};
         box.innerHTML = `<dl class="log-dl">
-      <dt>回测区间</dt><dd>${esc(bt.start_date)} ~ ${esc(bt.end_date)}（${bt.sample_days} 日）</dd>
-      <dt>方向准确率</dt><dd>固定 ${esc(bt.fixed_accuracy)} · 动态 <strong class="impact-pos">${esc(bt.dynamic_accuracy)}</strong></dd>
-      <dt>BTC 相关性</dt><dd>${bt.fixed_correlation} / ${bt.dynamic_correlation}</dd>
-      <dt>最优权重</dt><dd>宏观${ow.macro} 监管${ow.regulation} 资金${ow.funding} 币${ow.fundamentals}</dd>
+      <dt>回测区间</dt><dd>${esc(bt.start_date)} ~ ${esc(bt.end_date)}（${bt.sample_days} 个有效日）</dd>
+      <dt>方向准确率</dt><dd>旧版固定 ${esc(bt.fixed_accuracy)} · 动态 <strong class="impact-pos">${esc(bt.dynamic_accuracy)}</strong></dd>
+      <dt>与 BTC 日涨跌相关性</dt><dd>旧版 ${bt.fixed_correlation} · 动态 ${bt.dynamic_correlation}</dd>
+      <dt>网格搜索最优权重</dt><dd>宏观 ${ow.macro} · 监管 ${ow.regulation} · 资金 ${ow.funding} · 币种 ${ow.fundamentals}</dd>
+      ${bt.message ? `<dt>说明</dt><dd>${esc(bt.message)}</dd>` : ""}
+      ${bt.csv_path ? `<dt>CSV</dt><dd><code>${esc(bt.csv_path)}</code></dd>` : ""}
     </dl>`;
     }
 
@@ -227,9 +441,10 @@
                     : "<strong>—</strong>";
         }
         if (ratingEl) {
-            ratingEl.textContent = `当前市场评级：${ratingLabel || "待计算"}`;
+            ratingEl.textContent = ratingLabel || "待计算";
             ratingEl.className = `rating-tag ${ratingClass || "rating-neutral"}`;
         }
+        renderCentralGauge(totalScore, ratingLabel, ratingClass);
     }
 
     async function refreshDashboard() {
@@ -260,6 +475,8 @@
                 data.rating_label,
                 data.rating_class
             );
+            renderWeightScoreStrip(data.categories, wo.dynamic_weights);
+            renderNewsTicker(data.top_news);
             renderNewsTable("news-tbody", data.top_news);
             renderNewsTable("sol-news-tbody", data.sol_news);
             renderNewsTable("eth-news-tbody", data.eth_news);
@@ -303,7 +520,36 @@
         }
     }
 
+    function bindNewsModal() {
+        document.addEventListener("click", (e) => {
+            const openBtn = e.target.closest("[data-news-open]");
+            if (openBtn) {
+                const idx = parseInt(openBtn.getAttribute("data-news-open"), 10);
+                openNewsModal(window.__topNewsList[idx]);
+                return;
+            }
+            const row = e.target.closest("[data-news-table]");
+            if (row) {
+                const tid = row.getAttribute("data-news-table");
+                const idx = parseInt(row.getAttribute("data-news-index"), 10);
+                const list = (window.__newsTables || {})[tid];
+                if (list && list[idx]) openNewsModal(list[idx]);
+                return;
+            }
+            if (e.target.closest("[data-news-close]")) closeNewsModal();
+        });
+        document.addEventListener("keydown", (e) => {
+            if (e.key === "Escape") closeNewsModal();
+            const row = e.target.closest("[data-news-table]");
+            if (row && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                row.click();
+            }
+        });
+    }
+
     document.addEventListener("DOMContentLoaded", () => {
+        bindNewsModal();
         refreshPrices();
         refreshDashboard();
         setInterval(refreshPrices, priceMs);

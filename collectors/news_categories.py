@@ -1,6 +1,6 @@
 """
 资讯分类过滤：SOL / ETH / 美股宏观 独立 TOP 列表
-各分类互不混杂，仅展示与该类强相关的消息。
+加密池与宏观池分离；宏观板块剔除加密关键词。
 """
 
 from __future__ import annotations
@@ -10,34 +10,70 @@ from typing import Any
 
 from collectors.types import NewsItem
 
-# SOL 专属（Solana 生态）
+# SOL 生态（公链 / 基金会 / Pay.sh / 链上升级）
 _SOL_PATTERNS = re.compile(
-    r"\b(solana|\bsol\b|\$sol|jito|raydium|marinade|phantom wallet|"
-    r"solana foundation|firedancer|saga phone|bonk|wif on sol)\b",
+    r"\b(solana|\bsol\b|\$sol|jito|raydium|marinade|phantom|bonk|wif|"
+    r"pump\.fun|orca|meteora|tensor|helius|firedancer|saga|"
+    r"sol etf|solana etf|solana foundation|validator|pay\.sh|pay sh|"
+    r"onchain perps|agave|mainnet upgrade|solana ecosystem)\b",
     re.I,
 )
 
-# ETH 专属（以太坊生态）
+_SOL_BLOCK = re.compile(
+    r"\b(bitcoin|\bbtc\b|\$btc|ethereum|\beth\b|\$eth|"
+    r"cpi|nonfarm|fomc|powell|treasury yield|s&p 500|nasdaq composite)\b",
+    re.I,
+)
+
+_SOL_RELAXED = re.compile(
+    r"\b(solana|\bsol\b|\$sol|bonk|jito|raydium)\b",
+    re.I,
+)
+
+# ETH 生态 / SEC / ETF
 _ETH_PATTERNS = re.compile(
-    r"\b(ethereum|\beth\b|\$eth|ether\b|eip-\d+|erc-20|erc20|"
-    r"layer.?2|l2\b|arbitrum|optimism|base chain|staking reward|"
-    r"beacon chain|vitalik|gas fee)\b",
+    r"\b(ethereum|\beth\b|\$eth|ether\b|eip-\d+|eip\d+|erc-20|erc20|"
+    r"layer.?2|\bl2\b|arbitrum|optimism|base chain|staking|beacon|"
+    r"vitalik|gas fee|eth etf|spot eth|consensys|uniswap|"
+    r"grayscale eth|blackrock eth|sec.*eth|eth.*sec)\b",
     re.I,
 )
 
-# 美股 / 宏观
+_ETH_RELAXED = re.compile(
+    r"\b(ethereum|\beth\b|\$eth|staking|eth etf|layer 2)\b",
+    re.I,
+)
+
+_ETH_BLOCK = re.compile(
+    r"\b(solana|\bsol\b|\$sol|bitcoin|\bbtc\b|\$btc|bonk|jito)\b",
+    re.I,
+)
+
+# 美股 / 宏观（用户指定关键词）
 _MACRO_PATTERNS = re.compile(
-    r"\b(cpi|ppi|core pce|nonfarm|nfp|jobs report|unemployment|"
+    r"\b(cpi|ppi|core pce|\bpce\b|nonfarm|nfp|jobs report|unemployment|"
     r"federal reserve|\bfed\b|fomc|powell|rate cut|rate hike|interest rate|"
     r"inflation|treasury yield|10-year|10y yield|bond yield|"
     r"s&p 500|s&p500|nasdaq|dow jones|wall street|stock market|"
-    r"gdp|recession|dollar index|dxy|国债|非农|美联储|加息|降息|通胀|"
-    r"美股|标普|纳斯达克|道琼斯)\b",
+    r"gdp|recession|dollar index|\bdxy\b|pmi|earnings|"
+    r"国债|非农|美联储|加息|降息|通胀|美股|标普|纳斯达克|道琼斯|"
+    r"美债|十年期|财报|纳指|道指|sec\b|证监会)\b",
     re.I,
 )
 
-# 纯 BTC 且无 SOL/ETH 关键词时，不进入币种专属栏
-_BTC_ONLY = re.compile(r"\b(bitcoin|\bbtc\b|\$btc)\b", re.I)
+# 宏观板块排除加密
+_CRYPTO_BLOCK = re.compile(
+    r"\b(bitcoin|\bbtc\b|\$btc|ethereum|\beth\b|\$eth|solana|\bsol\b|\$sol|"
+    r"crypto|cryptocurrency|blockchain|defi|nft|digital currency|"
+    r"加密|数字货币|比特币|以太坊|solana)\b",
+    re.I,
+)
+
+_TRUSTED_MACRO_SOURCES = re.compile(
+    r"美联储|fed|bls|劳工|fred|sec|reuters|路透|bloomberg|彭博|"
+    r"cnbc|wsj|华尔街|marketwatch|benzinga|金融时报|wallstreet",
+    re.I,
+)
 
 
 def _item_text(item: NewsItem) -> str:
@@ -48,42 +84,145 @@ def _item_text(item: NewsItem) -> str:
     return " ".join(p for p in parts if p).lower()
 
 
-def is_sol_related(item: NewsItem) -> bool:
-    text = _item_text(item)
-    if not _SOL_PATTERNS.search(text):
+def _currency_codes(item: NewsItem) -> set[str]:
+    codes: set[str] = set()
+    for kw in item.keywords:
+        if str(kw).upper() in ("BTC", "ETH", "SOL"):
+            codes.add(str(kw).upper())
+    for c in (item.raw or {}).get("currencies") or []:
+        code = (c.get("code") if isinstance(c, dict) else c) or ""
+        if code:
+            codes.add(str(code).upper())
+    return codes
+
+
+def is_crypto_topic(item: NewsItem) -> bool:
+    return bool(_CRYPTO_BLOCK.search(_item_text(item)))
+
+
+def classify_news_tag(item: NewsItem) -> str:
+    """TOP10 四类彩色标签。"""
+    if item.feed_type == "macro":
+        return "美股宏观"
+    src = (item.source or "").lower()
+    if "solana" in src or "solana生态" in item.source:
+        return "SOL生态"
+    if "以太坊" in item.source or "ethereum" in src:
+        return "ETH生态"
+    sol = is_sol_related(item, relaxed=True)
+    eth = is_eth_related(item, relaxed=True)
+    if sol and not eth:
+        return "SOL生态"
+    if eth and not sol:
+        return "ETH生态"
+    if sol:
+        return "SOL生态"
+    if eth:
+        return "ETH生态"
+    return "全市场加密"
+
+
+def is_sol_related(item: NewsItem, *, relaxed: bool = False) -> bool:
+    if item.feed_type == "macro":
         return False
-    # 宏观类消息若仅顺带提及 SOL，仍归宏观（优先宏观独占）
-    if is_macro_related(item) and not re.search(
+    codes = _currency_codes(item)
+    if "BTC" in codes or "ETH" in codes:
+        if "SOL" not in codes:
+            return False
+    if "SOL" in codes and "ETH" not in codes and "BTC" not in codes:
+        return True
+    text = _item_text(item)
+    pat = _SOL_RELAXED if relaxed else _SOL_PATTERNS
+    if not pat.search(text):
+        return False
+    if _SOL_BLOCK.search(text) and not re.search(
+        r"\b(solana|\bsol\b|\$sol|pay\.sh)\b", text, re.I
+    ):
+        return False
+    if is_macro_related(item, allow_crypto_context=True) and not re.search(
         r"\b(solana|\bsol\b|\$sol)\b", text, re.I
     ):
         return False
     return True
 
 
-def is_eth_related(item: NewsItem) -> bool:
-    text = _item_text(item)
-    if not _ETH_PATTERNS.search(text):
+def is_eth_related(item: NewsItem, *, relaxed: bool = False) -> bool:
+    if item.feed_type == "macro":
         return False
-    if is_macro_related(item) and not re.search(
+    codes = _currency_codes(item)
+    if "BTC" in codes and "ETH" not in codes:
+        return False
+    if "SOL" in codes and "ETH" not in codes:
+        return False
+    if "ETH" in codes:
+        return True
+    text = _item_text(item)
+    pat = _ETH_RELAXED if relaxed else _ETH_PATTERNS
+    if not pat.search(text):
+        return False
+    if _ETH_BLOCK.search(text) and not re.search(
+        r"\b(ethereum|\beth\b|\$eth|vitalik)\b", text, re.I
+    ):
+        return False
+    if is_macro_related(item, allow_crypto_context=True) and not re.search(
         r"\b(ethereum|\beth\b|\$eth)\b", text, re.I
     ):
         return False
     return True
 
 
-def is_macro_related(item: NewsItem) -> bool:
-    return bool(_MACRO_PATTERNS.search(_item_text(item)))
+def is_macro_related(item: NewsItem, *, allow_crypto_context: bool = False) -> bool:
+    if item.feed_type == "macro":
+        if not allow_crypto_context and is_crypto_topic(item):
+            return False
+        if _MACRO_PATTERNS.search(_item_text(item)):
+            return True
+        if _TRUSTED_MACRO_SOURCES.search(item.source):
+            return True
+        return not is_crypto_topic(item)
+
+    text = _item_text(item)
+    if not allow_crypto_context and is_crypto_topic(item):
+        return False
+    return bool(_MACRO_PATTERNS.search(text))
 
 
-def filter_by_category(items: list[NewsItem], category: str) -> list[NewsItem]:
+def filter_by_category(
+    items: list[NewsItem],
+    category: str,
+    *,
+    relaxed: bool = False,
+) -> list[NewsItem]:
     """category: sol | eth | macro"""
     if category == "sol":
-        return [i for i in items if is_sol_related(i)]
-    if category == "eth":
-        return [i for i in items if is_eth_related(i)]
-    if category == "macro":
-        return [i for i in items if is_macro_related(i)]
-    return []
+        fn = lambda i: is_sol_related(i, relaxed=relaxed)
+    elif category == "eth":
+        fn = lambda i: is_eth_related(i, relaxed=relaxed)
+    elif category == "macro":
+        result: list[NewsItem] = []
+        for i in items:
+            if is_crypto_topic(i):
+                continue
+            if i.feed_type == "macro":
+                result.append(i)
+            elif is_macro_related(i, allow_crypto_context=False):
+                result.append(i)
+        return result
+    else:
+        return []
+    return [i for i in items if fn(i)]
+
+
+def _dedupe_news(items: list[NewsItem]) -> list[NewsItem]:
+    seen: set[str] = set()
+    out: list[NewsItem] = []
+    for it in items:
+        key = (it.title or "").strip().lower()[:120]
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        out.append(it)
+    return out
 
 
 def select_category_top(
@@ -92,8 +231,40 @@ def select_category_top(
     *,
     limit: int = 10,
     to_display,
+    pool: str | None = None,
 ) -> list[dict[str, Any]]:
-    """按影响分绝对值排序，取分类 TOP N。"""
-    filtered = filter_by_category(items, category)
+    """
+    按影响分绝对值排序，取分类 TOP N。
+    pool: crypto | macro | None(全部) — 限制候选池
+    """
+    if pool == "crypto":
+        candidates = [i for i in items if i.feed_type == "crypto"]
+    elif pool == "macro":
+        candidates = [
+            i for i in items if i.feed_type == "macro" and not is_crypto_topic(i)
+        ]
+    else:
+        candidates = list(items)
+
+    if category == "macro" and pool == "macro":
+        filtered = list(candidates)
+    else:
+        filtered = filter_by_category(candidates, category)
+    if len(filtered) < min(3, limit):
+        filtered = _dedupe_news(
+            filtered + filter_by_category(candidates, category, relaxed=True)
+        )
+
+    if category == "macro" and len(filtered) < limit:
+        macro_only = [i for i in candidates if i.feed_type == "macro" and not is_crypto_topic(i)]
+        filtered = _dedupe_news(filtered + macro_only)
+
+    if category in ("sol", "eth") and len(filtered) < limit:
+        codes = "SOL" if category == "sol" else "ETH"
+        for it in candidates:
+            if codes in _currency_codes(it):
+                filtered.append(it)
+        filtered = _dedupe_news(filtered)
+
     sorted_items = sorted(filtered, key=lambda x: abs(x.impact_score), reverse=True)
     return [to_display(n) for n in sorted_items[:limit]]
