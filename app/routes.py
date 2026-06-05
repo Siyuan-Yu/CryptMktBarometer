@@ -155,16 +155,22 @@ def api_prices():
     cache_sec = float(cfg.get("web", {}).get("price_cache_seconds", 4) or 4)
     timeout = int(cfg.get("collector", {}).get("request_timeout_sec", 10))
 
+    from collectors.fear_greed_ticker import get_cached_fear_greed
     from collectors.price_ticker import get_cached_prices
 
     data = get_cached_prices(cache_seconds=cache_sec, timeout=timeout)
+    fg_cache = float(cfg.get("web", {}).get("fear_greed_cache_seconds", 60) or 60)
+    data["fear_greed"] = get_cached_fear_greed(
+        cache_seconds=fg_cache,
+        timeout=timeout,
+    )
     return jsonify(data)
 
 
 @bp.route("/api/score-history")
 def api_score_history():
     """四品种分数历史（2026 年初至今，来自 score_history.csv）。"""
-    since = request.values.get("since", "2026-01-01")
+    since = request.values.get("since", "2025-01-01")
     from core.score_history import build_score_history_payload
 
     return jsonify(build_score_history_payload(since=since))
@@ -177,7 +183,7 @@ def api_export_score_history():
 
     from core.score_export import _EXPORT_FILENAME, build_score_history_csv
 
-    since = request.values.get("since", "2026-01-01")
+    since = request.values.get("since", "2025-01-01")
     csv_body = build_score_history_csv(since=since)
     return Response(
         csv_body,

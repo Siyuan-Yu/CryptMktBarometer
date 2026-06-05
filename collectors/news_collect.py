@@ -1,6 +1,6 @@
 """
 资讯采集汇总
-加密源与美股宏观源彻底拆分；合并后供计分，分类展示各自独立池。
+四车道（BTC/ETH/SOL/宏观）隔离 → 质量筛选 → 分级计分 → 合并供晴雨表。
 """
 
 from __future__ import annotations
@@ -8,9 +8,20 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from collectors.news_cryptopanic import fetch_cryptopanic
-from collectors.news_macro_rss import fetch_macro_feeds
-from collectors.news_rss import fetch_rss_by_key
+from collectors.news_cryptopanic import fetch_cryptopanic_lane
+from collectors.news_macro_rss import fetch_crypto_macro_feeds, fetch_macro_feeds
+from collectors.news_pipeline import merge_lane_batches, process_lane_batch
+from collectors.news_source_catalog import (
+    BTC_FEEDS,
+    CRYPTO_MACRO_FEEDS,
+    ETH_FEEDS,
+    LANE_FEED_MAP,
+    MACRO_FEED_KEYS,
+    SOL_FEEDS,
+    feed_url,
+)
+from collectors.news_recency import filter_recent_news, sort_by_recency_impact
+from collectors.news_rss import fetch_rss_lane_feed
 from collectors.types import NewsItem
 
 logger = logging.getLogger(__name__)
@@ -22,105 +33,206 @@ def select_top_news(
     *,
     to_display=None,
 ) -> list[dict[str, Any]]:
-    """按影响分值绝对值降序，取前 N 条。"""
     convert = to_display or (lambda n: n.to_display_dict())
-    sorted_items = sorted(items, key=lambda x: abs(x.impact_score), reverse=True)
+    recent = filter_recent_news(items)
+    sorted_items = sort_by_recency_impact(recent)
     return [convert(n) for n in sorted_items[:limit]]
 
 
-def collect_crypto_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
-    """仅 CoinDesk / The Block / CryptoPanic / CoinGlass。"""
-    ds = cfg.get("data_sources", {}).get("news", {})
-    api_keys = cfg.get("api_keys", {})
-    collector_cfg = cfg.get("collector", {})
-    timeout = int(collector_cfg.get("request_timeout_sec", 15))
-    max_rss = int(collector_cfg.get("rss_max_items", 30))
-    rss_urls = collector_cfg.get("rss", {}) or collector_cfg.get("rss_crypto", {})
-
-    all_items: list[NewsItem] = []
-    summary_lines: list[str] = []
+def _fetch_lane_rss(
+    lane: str,
+    feeds: tuple,
+    rss_cfg: dict[str, Any],
+    *,
+    timeout: int,
+    max_rss: int,
+    ds: dict[str, Any],
+) -> tuple[list[NewsItem], list[str], list[str]]:
+    items: list[NewsItem] = []
+    summary: list[str] = []
     errors: list[str] = []
 
-    if ds.get("cryptopanic", False):
-        items, err = fetch_cryptopanic(
-            api_keys.get("cryptopanic", ""),
-            timeout=timeout,
-        )
-        if err:
-            if "未配置" in err or "已跳过" in err:
-                summary_lines.append(err)
-            else:
-                errors.append(err)
-                summary_lines.append("CryptoPanic：失败")
-        else:
-            all_items.extend(items)
-            summary_lines.append(f"CryptoPanic：{len(items)} 条")
-
-    _labels = {
-        "coindesk": "CoinDesk",
-        "theblock": "The Block",
-        "coinglass": "CoinGlass",
-        "solana": "Solana生态",
-        "ethereum_blog": "以太坊生态",
-    }
-    for key in ("coindesk", "theblock", "coinglass", "solana", "ethereum_blog"):
-        if not ds.get(key, False):
+    for key, name, default_url, asset_lane, tier in feeds:
+        cfg_key = key
+        if ds.get(cfg_key) is False:
             continue
-        items, err = fetch_rss_by_key(
-            key,
-            rss_urls,
+        url = feed_url(rss_cfg, cfg_key, default_url)
+        batch, err = fetch_rss_lane_feed(
+            cfg_key,
+            name,
+            url,
+            asset_lane=asset_lane,
+            source_tier=tier,
             timeout=timeout,
             max_items=max_rss,
         )
-        label = _labels[key]
         if err:
-            if key == "coinglass":
-                summary_lines.append(f"{label}：RSS 暂不可用（可改用 Solana/ETH 生态源）")
-            else:
-                errors.append(err)
-                summary_lines.append(f"{label}：失败")
-        else:
-            for it in items:
-                if key == "solana" and "SOL" not in [k.upper() for k in it.keywords]:
-                    it.keywords = ["SOL"] + list(it.keywords)
-                if key == "ethereum_blog" and "ETH" not in [
-                    k.upper() for k in it.keywords
-                ]:
-                    it.keywords = ["ETH"] + list(it.keywords)
-            all_items.extend(items)
-            summary_lines.append(f"{label}：{len(items)} 条")
+            errors.append(err)
+            summary.append(f"{name}：失败")
+        elif batch:
+            items.extend(batch)
+            summary.append(f"{name}：{len(batch)} 条")
 
-    logger.info("加密资讯 %d 条", len(all_items))
-    return all_items, summary_lines, errors
+    processed = process_lane_batch(items, lane)
+    return processed, summary, errors
+
+
+def collect_btc_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
+    ds = cfg.get("data_sources", {}).get("news", {})
+    collector_cfg = cfg.get("collector", {})
+    timeout = int(collector_cfg.get("request_timeout_sec", 15))
+    max_rss = int(collector_cfg.get("rss_max_items", 30))
+    rss_urls = collector_cfg.get("rss", {}) or {}
+
+    items: list[NewsItem] = []
+    summary: list[str] = []
+    errors: list[str] = []
+
+    if ds.get("cryptopanic", False):
+        cp, err = fetch_cryptopanic_lane(
+            cfg.get("api_keys", {}).get("cryptopanic", ""),
+            lane="btc",
+            timeout=timeout,
+        )
+        if err and "未配置" not in err:
+            errors.append(err)
+        elif cp:
+            items.extend(cp)
+            summary.append(f"CryptoPanic·BTC：{len(cp)} 条")
+        elif err:
+            summary.append(err)
+
+    rss_items, s2, e2 = _fetch_lane_rss(
+        "btc", BTC_FEEDS, rss_urls, timeout=timeout, max_rss=max_rss, ds=ds
+    )
+    items.extend(rss_items)
+    summary.extend(s2)
+    errors.extend(e2)
+
+    return process_lane_batch(items, "btc"), summary, errors
+
+
+def collect_eth_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
+    ds = cfg.get("data_sources", {}).get("news", {})
+    collector_cfg = cfg.get("collector", {})
+    timeout = int(collector_cfg.get("request_timeout_sec", 15))
+    max_rss = int(collector_cfg.get("rss_max_items", 30))
+    rss_urls = collector_cfg.get("rss", {}) or {}
+
+    items: list[NewsItem] = []
+    summary: list[str] = []
+    errors: list[str] = []
+
+    if ds.get("cryptopanic", False):
+        cp, err = fetch_cryptopanic_lane(
+            cfg.get("api_keys", {}).get("cryptopanic", ""),
+            lane="eth",
+            timeout=timeout,
+        )
+        if err and "未配置" not in err:
+            errors.append(err)
+        elif cp:
+            items.extend(cp)
+            summary.append(f"CryptoPanic·ETH：{len(cp)} 条")
+
+    rss_items, s2, e2 = _fetch_lane_rss(
+        "eth", ETH_FEEDS, rss_urls, timeout=timeout, max_rss=max_rss, ds=ds
+    )
+    items.extend(rss_items)
+    summary.extend(s2)
+    errors.extend(e2)
+
+    return process_lane_batch(items, "eth"), summary, errors
+
+
+def collect_sol_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
+    ds = cfg.get("data_sources", {}).get("news", {})
+    collector_cfg = cfg.get("collector", {})
+    timeout = int(collector_cfg.get("request_timeout_sec", 15))
+    max_rss = int(collector_cfg.get("rss_max_items", 30))
+    rss_urls = collector_cfg.get("rss", {}) or {}
+
+    items: list[NewsItem] = []
+    summary: list[str] = []
+    errors: list[str] = []
+
+    if ds.get("cryptopanic", False):
+        cp, err = fetch_cryptopanic_lane(
+            cfg.get("api_keys", {}).get("cryptopanic", ""),
+            lane="sol",
+            timeout=timeout,
+        )
+        if err and "未配置" not in err:
+            errors.append(err)
+        elif cp:
+            items.extend(cp)
+            summary.append(f"CryptoPanic·SOL：{len(cp)} 条")
+
+    rss_items, s2, e2 = _fetch_lane_rss(
+        "sol", SOL_FEEDS, rss_urls, timeout=timeout, max_rss=max_rss, ds=ds
+    )
+    items.extend(rss_items)
+    summary.extend(s2)
+    errors.extend(e2)
+
+    return process_lane_batch(items, "sol"), summary, errors
+
+
+def collect_crypto_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
+    """加密三车道合并（计分全量池）。"""
+    btc, s1, e1 = collect_btc_news(cfg)
+    eth, s2, e2 = collect_eth_news(cfg)
+    sol, s3, e3 = collect_sol_news(cfg)
+    merged = merge_lane_batches(btc, eth, sol)
+    summary = []
+    if s1:
+        summary.append("BTC[" + "；".join(s1) + "]")
+    if s2:
+        summary.append("ETH[" + "；".join(s2) + "]")
+    if s3:
+        summary.append("SOL[" + "；".join(s3) + "]")
+    return merged, summary, e1 + e2 + e3
 
 
 def collect_macro_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
-    """仅美股/宏观财经 RSS，不含任何加密媒体。"""
     ds = cfg.get("data_sources", {}).get("news", {})
     collector_cfg = cfg.get("collector", {})
     timeout = int(collector_cfg.get("request_timeout_sec", 15))
     max_rss = int(collector_cfg.get("rss_macro_max_items", 20))
-    rss_macro = collector_cfg.get("rss_macro", {})
-
+    rss_macro = dict(collector_cfg.get("rss_macro", {}))
     enabled = ds.get("macro", True)
-    return fetch_macro_feeds(
-        rss_macro,
+
+    if not enabled:
+        return [], ["美股宏观 RSS：已关闭"], []
+
+    filtered_macro = {k: rss_macro[k] for k in MACRO_FEED_KEYS if k in rss_macro}
+    items, summary, errors = fetch_macro_feeds(
+        filtered_macro,
         timeout=timeout,
         max_items=max_rss,
-        enabled=enabled,
+        enabled=True,
     )
+    crypto_macro_urls = {
+        k: rss_macro[k] for k, *_ in CRYPTO_MACRO_FEEDS if k in rss_macro
+    }
+    cm_items, cm_sum, cm_err = fetch_crypto_macro_feeds(
+        crypto_macro_urls if crypto_macro_urls else dict(rss_macro),
+        timeout=timeout,
+        max_items=max_rss,
+    )
+    items.extend(cm_items)
+    summary.extend(cm_sum)
+    errors.extend(cm_err)
+    processed = process_lane_batch(items, "macro")
+    return processed, summary, errors
 
 
 def collect_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[str]]:
-    """
-    拉取加密 + 宏观全部资讯（计分用全量）。
-    :return: (全部资讯, 成功摘要行, 错误列表)
-    """
     crypto, s1, e1 = collect_crypto_news(cfg)
     macro, s2, e2 = collect_macro_news(cfg)
     summary = []
     if s1:
-        summary.append("加密[" + "；".join(s1) + "]")
+        summary.append("加密" + "".join(s1))
     if s2:
         summary.append("宏观[" + "；".join(s2) + "]")
     return crypto + macro, summary, e1 + e2
@@ -129,12 +241,14 @@ def collect_news(cfg: dict[str, Any]) -> tuple[list[NewsItem], list[str], list[s
 def collect_news_split(
     cfg: dict[str, Any],
 ) -> tuple[list[NewsItem], list[NewsItem], list[str], list[str]]:
-    """分别返回加密池、宏观池及摘要/错误。"""
-    crypto, s1, e1 = collect_crypto_news(cfg)
-    macro, s2, e2 = collect_macro_news(cfg)
-    summary = []
-    if s1:
-        summary.append("加密[" + "；".join(s1) + "]")
-    if s2:
-        summary.append("宏观[" + "；".join(s2) + "]")
-    return crypto, macro, summary, e1 + e2
+    btc, _, e1 = collect_btc_news(cfg)
+    eth, _, e2 = collect_eth_news(cfg)
+    sol, _, e3 = collect_sol_news(cfg)
+    macro, s2, e2m = collect_macro_news(cfg)
+
+    crypto_merged = merge_lane_batches(btc, eth, sol)
+    summary = [
+        f"车道 BTC {len(btc)} · ETH {len(eth)} · SOL {len(sol)}",
+        "宏观[" + "；".join(s2) + "]" if s2 else "宏观[]",
+    ]
+    return crypto_merged, macro, summary, e1 + e2 + e3 + e2m

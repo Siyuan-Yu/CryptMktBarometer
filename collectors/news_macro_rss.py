@@ -10,6 +10,7 @@ from typing import Any
 
 from collectors.news_impact import score_from_macro_title, score_from_title
 from collectors.news_rss import fetch_rss_feed
+from collectors.news_source_catalog import CRYPTO_MACRO_FEEDS, MACRO_FEED_KEYS
 from collectors.types import NewsItem
 
 logger = logging.getLogger(__name__)
@@ -53,7 +54,10 @@ def fetch_macro_feeds(
     summary: list[str] = []
     errors: list[str] = []
 
-    for key, name, default_url in MACRO_FEED_CATALOG:
+    catalog = {k: (n, u) for k, n, u in MACRO_FEED_CATALOG}
+    keys = [k for k in MACRO_FEED_KEYS if k in catalog]
+    for key in keys:
+        name, default_url = catalog[key]
         url = str(feed_urls.get(key) or default_url).strip()
         items, err = fetch_rss_feed(
             name,
@@ -62,6 +66,9 @@ def fetch_macro_feeds(
             max_items=max_items,
             feed_type="macro",
             score_fn=_score_macro_item,
+            asset_lane="macro",
+            source_tier="authority",
+            feed_key=key,
         )
         if err:
             errors.append(err)
@@ -72,4 +79,38 @@ def fetch_macro_feeds(
             summary.append(f"{name}：{len(items)} 条")
 
     logger.info("美股宏观资讯合计 %d 条", len(all_items))
+    return all_items, summary, errors
+
+
+def fetch_crypto_macro_feeds(
+    feed_urls: dict[str, Any],
+    *,
+    timeout: int = 15,
+    max_items: int = 20,
+) -> tuple[list[NewsItem], list[str], list[str]]:
+    """Blockworks / Decrypt 监管 / CT 全球政策等加密宏观源。"""
+    all_items: list[NewsItem] = []
+    summary: list[str] = []
+    errors: list[str] = []
+
+    for key, name, default_url, asset_lane, tier in CRYPTO_MACRO_FEEDS:
+        url = str(feed_urls.get(key) or default_url).strip()
+        items, err = fetch_rss_feed(
+            name,
+            url,
+            timeout=timeout,
+            max_items=max_items,
+            feed_type="macro",
+            score_fn=_score_macro_item,
+            asset_lane=asset_lane,
+            source_tier=tier,
+            feed_key=key,
+        )
+        if err:
+            errors.append(err)
+            summary.append(f"{name}：失败")
+        elif items:
+            all_items.extend(items)
+            summary.append(f"{name}：{len(items)} 条")
+
     return all_items, summary, errors

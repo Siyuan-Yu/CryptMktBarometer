@@ -13,7 +13,8 @@ from collectors.types import NewsItem
 # BTC 生态（现货 ETF、灰度、SEC、矿工、链上、减半、机构持仓）
 _BTC_PATTERNS = re.compile(
     r"\b(bitcoin|\bbtc\b|\$btc|satosh|halving|hash rate|hashrate|"
-    r"miner|mining|microstrategy|mstr|grayscale|gbtc|bitcoin etf|spot btc|"
+    r"miner|mining|microstrategy|mstr|grayscale|gbtc|ark invest|bitcoin core|"
+    r"bitcoin etf|spot btc|"
     r"btc etf|blackrock.*btc|fidelity.*btc|sec.*btc|btc.*sec|"
     r"on-chain|onchain|whale|institutional|treasury.*btc|coinbase.*custody|"
     r"灰度|比特币|减半|矿工|链上|现货etf|机构持仓|etf流入|etf流出)\b",
@@ -33,7 +34,7 @@ _BTC_RELAXED = re.compile(
 
 # SOL 生态（公链 / 基金会 / Pay.sh / 链上升级）
 _SOL_PATTERNS = re.compile(
-    r"\b(solana|\bsol\b|\$sol|jito|raydium|marinade|phantom|bonk|wif|"
+    r"\b(solana|\bsol\b|\$sol|jupiter|jito|raydium|marinade|phantom|fantom|ftm|bonk|wif|"
     r"pump\.fun|orca|meteora|tensor|helius|firedancer|saga|"
     r"sol etf|solana etf|solana foundation|validator|pay\.sh|pay sh|"
     r"onchain perps|agave|mainnet upgrade|solana ecosystem)\b",
@@ -55,7 +56,7 @@ _SOL_RELAXED = re.compile(
 _ETH_PATTERNS = re.compile(
     r"\b(ethereum|\beth\b|\$eth|ether\b|eip-\d+|eip\d+|erc-20|erc20|"
     r"layer.?2|\bl2\b|arbitrum|optimism|base chain|staking|beacon|"
-    r"vitalik|gas fee|eth etf|spot eth|consensys|uniswap|"
+    r"bankless|defiant|vitalik|gas fee|eth etf|spot eth|consensys|uniswap|"
     r"grayscale eth|blackrock eth|sec.*eth|eth.*sec)\b",
     re.I,
 )
@@ -298,6 +299,10 @@ def select_category_top(
     else:
         candidates = list(items)
 
+    from collectors.news_recency import filter_recent_news, sort_by_recency_impact
+
+    candidates = filter_recent_news(candidates)
+
     if category == "macro" and pool == "macro":
         filtered = list(candidates)
     else:
@@ -319,5 +324,5 @@ def select_category_top(
                 filtered.append(it)
         filtered = _dedupe_news(filtered)
 
-    sorted_items = sorted(filtered, key=lambda x: abs(x.impact_score), reverse=True)
+    sorted_items = sort_by_recency_impact(filtered)
     return [to_display(n) for n in sorted_items[:limit]]

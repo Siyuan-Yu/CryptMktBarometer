@@ -10,8 +10,11 @@ import io
 from datetime import datetime
 from typing import Any
 
-from core.score_history import _score_from_row
+from scoring.multi_asset import score_status_label
+from storage.score_history_db import read_4h_series
+from core.score_history import _build_from_csv_bucketed
 from storage.csv_logger import read_score_history
+from storage.score_history_db import latest_4h_time
 
 _EXPORT_SYMBOLS: tuple[tuple[str, str], ...] = (
     ("btc", "BTC"),
@@ -46,15 +49,6 @@ def _format_bucket(dt: datetime) -> str:
     return dt.strftime("%Y-%m-%d %H:%M")
 
 
-def score_status(score: float) -> str:
-    """多空状态：看多 / 看空 / 中性（与晴雨表 55/45 阈值一致）。"""
-    if score >= 55:
-        return "看多"
-    if score < 45:
-        return "看空"
-    return "中性"
-
-
 def _bucket_rows_4h(rows: list[dict[str, str]]) -> list[tuple[datetime, dict[str, str]]]:
     """按 4 小时分桶，每桶保留最后一条原始记录。"""
     buckets: dict[datetime, dict[str, str]] = {}
@@ -74,30 +68,44 @@ def _bucket_rows_4h(rows: list[dict[str, str]]) -> list[tuple[datetime, dict[str
     return [(k, buckets[k]) for k in order]
 
 
-def build_score_history_export_rows(*, since: str = "2026-01-01") -> list[dict[str, Any]]:
+def build_score_history_export_rows(*, since: str = "2025-01-01") -> list[dict[str, Any]]:
     """生成导出行：time, symbol, score, status。"""
-    raw = read_score_history(since=since)
-    out: list[dict[str, Any]] = []
+    series = read_4h_series(since=since)
+    last_db = latest_4h_time() or ""
+    csv_rows = read_score_history(since=since)
+    if last_db and csv_rows:
+        newer = [r for r in csv_rows if (r.get("fetch_time") or "") > last_db]
+        if newer:
+            from core.score_history import _merge_series
 
-    for bucket_dt, row in _bucket_rows_4h(raw):
-        time_label = _format_bucket(bucket_dt)
-        for asset_key, symbol in _EXPORT_SYMBOLS:
-            score = _score_from_row(row, asset_key)
+            series = _merge_series(series, _build_from_csv_bucketed(newer))
+    elif not max(len(series[k]) for k in series) and csv_rows:
+        series = _build_from_csv_bucketed(csv_rows)
+
+    out: list[dict[str, Any]] = []
+    sym_map = {"btc": "BTC", "eth": "ETH", "sol": "SOL", "us": "美股"}
+    for asset_key, symbol in _EXPORT_SYMBOLS:
+        label = sym_map.get(asset_key, symbol)
+        for p in series.get(asset_key, []):
+            t = p.get("time") or ""
+            dt = _parse_fetch_time(t)
+            time_label = _format_bucket(dt) if dt else t[:16]
+            score = p.get("score")
             if score is None:
                 continue
             out.append(
                 {
                     "time": time_label,
-                    "symbol": symbol,
+                    "symbol": label,
                     "score": score,
-                    "status": score_status(score),
+                    "status": score_status_label(float(score)),
                 }
             )
-
+    out.sort(key=lambda r: (r["time"], r["symbol"]))
     return out
 
 
-def build_score_history_csv(*, since: str = "2026-01-01") -> str:
+def build_score_history_csv(*, since: str = "2025-01-01") -> str:
     """返回 UTF-8 BOM CSV 文本，便于 Excel 打开中文。"""
     rows = build_score_history_export_rows(since=since)
     buf = io.StringIO()

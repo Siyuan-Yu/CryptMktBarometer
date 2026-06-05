@@ -324,9 +324,16 @@ def register_top_news(news_items: list[NewsItem], top_display: list[dict]) -> No
                     pub = pub.replace(tzinfo=timezone.utc)
             except ValueError:
                 pass
+        source_tag = ""
+        if item and item.raw:
+            source_tag = item.raw.get("source_tag") or ""
+        source_label = row.get("source", "") or (item.source if item else "")
+        if source_tag:
+            source_label = f"{source_label}·{source_tag}"
+
         impact_db.insert_news_pending(
             title=title,
-            source=row.get("source", ""),
+            source=source_label[:120],
             url=row.get("url", ""),
             module=mod,
             published_at=pub,

@@ -44,6 +44,15 @@
         </div>
         <div class="price-hero-glow"></div>
     </div>
+    <div class="fear-greed-hero glass capsule fg-unknown" id="fear-greed-widget" aria-label="恐慌贪婪指数">
+        <div class="fear-greed-icon" id="fg-icon" aria-hidden="true">◎</div>
+        <div class="fear-greed-body">
+            <span class="fear-greed-tag">恐慌指数</span>
+            <span class="fear-greed-val" id="fg-value">—</span>
+            <span class="fear-greed-label" id="fg-label">加载中</span>
+        </div>
+        <div class="fear-greed-glow"></div>
+    </div>
     <p class="price-hero-meta">
         <span class="live-dot"></span> 实时价格 · 每 {{ price_refresh_seconds | default(5) }} 秒刷新
         · 更新 <span id="price-updated">—</span>

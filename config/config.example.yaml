@@ -25,15 +25,39 @@ storage:
 
 collector:
   request_timeout_sec: 15
+  news_max_age_days: 3
+  onchain_sync_hours: 4
+  community_sync_hours: 4
+  community_max_items: 25
   rss_max_items: 30
   rss_macro_max_items: 20
   rss:
     coindesk: "https://www.coindesk.com/arc/outboundfeeds/rss/"
     theblock: "https://www.theblock.co/rss.xml"
-    coinglass: "https://www.coinglass.com/feed"
+    bitcoin_magazine: "https://bitcoinmagazine.com/.rss/full/"
+    bitcoin_core: "https://bitcoincore.org/en/rss.xml"
+    glassnode: "https://insights.glassnode.com/rss/"
+    grayscale: "https://grayscale.com/feed/"
+    ark_invest: "https://ark-funds.com/feed"
+    sec_btc: "https://www.sec.gov/news/pressreleases.rss"
+    bankless: "https://www.bankless.com/feed"
+    the_defiant: "https://thedefiant.io/feed"
+    ethereum_magicians: "https://ethereum-magicians.org/latest.rss"
+    optimism_gov: "https://gov.optimism.io/latest.rss"
+    cointelegraph_arbitrum: "https://cointelegraph.com/rss/tag/arbitrum"
+    cointelegraph_optimism: "https://cointelegraph.com/rss/tag/optimism"
     solana: "https://solana.com/news/rss.xml"
+    solana_blog: "https://solana.com/news/rss.xml"
+    solana_status: "https://status.solana.com/history.rss"
+    marinade: "https://marinade.finance/blog/rss.xml"
+    cointelegraph_sol: "https://cointelegraph.com/rss/tag/solana"
+    cointelegraph_fantom: "https://cointelegraph.com/rss/tag/fantom"
     ethereum_blog: "https://blog.ethereum.org/feed.xml"
+    ethresearch: "https://ethresear.ch/latest.rss"
   rss_macro:
+    blockworks: "https://blockworks.co/feed"
+    decrypt: "https://decrypt.co/feed"
+    cointelegraph_policy: "https://cointelegraph.com/rss/tag/regulation"
     fed: "https://www.federalreserve.gov/feeds/press_all.xml"
     bls: "https://www.bls.gov/feed/bls_latest.rss"
     fred_blog: "https://fredblog.stlouisfed.org/feed/"
@@ -66,15 +90,55 @@ data_sources:
     cryptopanic: true
     coindesk: true
     theblock: true
-    coinglass: true
-    solana: true           # SOL 生态专属（Solana 官方 RSS）
-    ethereum_blog: true    # ETH 生态专属（以太坊基金会博客）
+    bitcoin_magazine: true
+    bitcoin_core: true
+    glassnode: true
+    grayscale: true
+    ark_invest: true
+    sec_btc: true
+    bankless: true
+    the_defiant: true
+    ethereum_magicians: true
+    optimism_gov: true
+    cointelegraph_arbitrum: true
+    cointelegraph_optimism: true
+    solana: true
+    solana_blog: true
+    solana_status: true
+    marinade: true
+    cointelegraph_sol: true
+    cointelegraph_fantom: true
+    ethereum_blog: true
+    ethresearch: true
+    blockworks: true
+    decrypt: true
+    cointelegraph_policy: true
     macro: true            # 美股/宏观专属 RSS（与加密源分离）
+
+community:
+  rsshub_base: "https://rsshub.app"
+  binance_square_use_proxy: true
+  twitter_accounts:
+    btc: ["Bitcoin", "saylor", "ARKInvest"]
+    eth: ["ethereum", "VitalikButerin", "bankless"]
+    sol: ["solana", "JupiterExchange", "marinadefinance"]
+
+scoring:
+  use_news_v2: true
+  use_layered_percentile: true
+  percentile_history_days: 90
   funding:
     coinglass_etf: true
     coinglass_liquidation: true
     coinglass_oi: true
+  community:
+    reddit: true
+    twitter: true
+    binance_square: true
   onchain:
-    solana_official: true
+    fear_greed: true
+    glassnode_signals: true
+    coinmarketcap_global: true
     eth_staking: true
-    dune_dashboard: true
+    solana_official: true
+    dune_dashboard: false

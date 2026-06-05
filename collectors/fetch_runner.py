@@ -12,6 +12,9 @@ from typing import Any
 
 from collectors.funding_collect import collect_funding
 from collectors.macro_collect import collect_macro
+from collectors.community_collect import collect_community
+from collectors.onchain_collect import collect_onchain
+from scoring.symbol_scores import compute_live_normalized_scores
 from collectors.news_collect import collect_news_split
 from collectors.news_display import prepare_all_news_views
 from core.config_loader import load_config
@@ -22,6 +25,7 @@ from storage.csv_logger import (
     append_news_snapshot,
     append_score_history,
 )
+from storage.score_history_db import upsert_4h_scores
 
 logger = logging.getLogger(__name__)
 
@@ -90,8 +94,14 @@ def run_data_fetch() -> FetchResult:
         funding = collect_funding(cfg)
         errors.extend(funding.errors)
 
-        onchain_summary = _onchain_pending_summary(cfg)
-        onchain_connected = False
+        onchain_result = collect_onchain()
+        onchain_connected = onchain_result.snapshot is not None
+        onchain_summary = (
+            onchain_result.summary
+            if onchain_connected
+            else _onchain_pending_summary(cfg)
+        )
+        errors.extend(onchain_result.errors)
 
         score_result = compute_scores(
             macro=macro,
@@ -103,6 +113,33 @@ def run_data_fetch() -> FetchResult:
             onchain_data_summary=onchain_summary,
         )
 
+        community_result = collect_community()
+        errors.extend(community_result.errors)
+
+        finished_at = datetime.now()
+        norm_scores = compute_live_normalized_scores(
+            all_news=all_news,
+            macro=macro,
+            funding=funding,
+            onchain_snap=onchain_result.snapshot,
+            community_lanes=community_result.lanes,
+            fetch_time=finished_at,
+        )
+        from core.market_rating import rating_from_total_score
+
+        score_result.total_score = norm_scores["BTC"]
+        score_result.rating_label = rating_from_total_score(
+            score_result.total_score
+        )
+        layer_note = (
+            f"｜分层60/30/10 BTC{norm_scores['BTC']:.0f}"
+            f"/ETH{norm_scores['ETH']:.0f}/SOL{norm_scores['SOL']:.0f}"
+        )
+        for cat in score_result.categories:
+            if cat.get("name") == "宏观数据":
+                cat["summary"] = str(cat.get("summary", "")) + layer_note
+                break
+
         opt_cfg = cfg.get("weight_optimizer", {})
         if opt_cfg.get("enabled", True):
             try:
@@ -112,13 +149,9 @@ def run_data_fetch() -> FetchResult:
                 wo.measure_pending_impacts()
                 weights = wo.compute_dynamic_weights(cfg)
                 if opt_cfg.get("use_dynamic_weights", True):
-                    total_dyn, cats_dyn = wo.apply_dynamic_total(
+                    _total_dyn, cats_dyn = wo.apply_dynamic_total(
                         score_result.categories, weights
                     )
-                    score_result.total_score = total_dyn
-                    from core.market_rating import rating_from_total_score
-
-                    score_result.rating_label = rating_from_total_score(total_dyn)
                     score_result.categories = cats_dyn
                 inf7, inf30 = wo.get_dual_module_influence()
                 recalc_h = int(opt_cfg.get("recalc_interval_hours", 6))
@@ -154,7 +187,6 @@ def run_data_fetch() -> FetchResult:
 
         sources_summary = "。".join(summary_parts) + "。"
 
-        finished_at = datetime.now()
         result = FetchResult(
             started_at=started_at,
             finished_at=finished_at,
@@ -198,6 +230,23 @@ def run_data_fetch() -> FetchResult:
             summary=sources_summary[:500],
         )
         append_news_snapshot(finished_at, top_news)
+        def _cat_pts(name: str) -> float | None:
+            for c in score_result.categories:
+                if c.get("name") == name:
+                    s = c.get("score")
+                    return float(s) if s is not None else None
+            return None
+
+        upsert_4h_scores(
+            finished_at,
+            norm_scores=norm_scores,
+            rating=score_result.rating_label,
+            macro=_cat_pts("宏观数据"),
+            regulation=_cat_pts("全球监管政策"),
+            funding=_cat_pts("资金链上数据"),
+            fundamentals=_cat_pts("ETH/SOL 币种基本面"),
+        )
+
         append_score_history(
             finished_at,
             total_score=score_result.total_score,

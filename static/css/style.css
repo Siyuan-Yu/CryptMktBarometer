@@ -112,10 +112,11 @@ body.firefly-ui {
    ============================================================================= */
 .price-hero-strip {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(148px, 188px);
     gap: 1rem;
     margin-bottom: 1.25rem;
     position: relative;
+    align-items: stretch;
 }
 
 .price-hero {
@@ -199,6 +200,135 @@ body.firefly-ui {
 .price-hero .chg-up { color: var(--c-bull-s); }
 .price-hero-chg.chg-down,
 .price-hero .chg-down { color: var(--c-bear-s); }
+
+/* 恐慌贪婪指数（价格区右侧） */
+.fear-greed-hero {
+    position: relative;
+    border-radius: var(--ff-r-lg);
+    padding: 1rem 1.1rem;
+    overflow: hidden;
+    min-height: 118px;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.35s ease;
+    background: linear-gradient(145deg, rgba(252, 252, 255, 0.9), rgba(240, 244, 252, 0.82));
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+}
+
+.fear-greed-hero:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 40px rgba(140, 180, 230, 0.2);
+}
+
+.fear-greed-glow {
+    position: absolute;
+    inset: -25%;
+    pointer-events: none;
+    opacity: 0.55;
+    transition: opacity 0.35s ease;
+}
+
+.fear-greed-icon {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 800;
+    flex-shrink: 0;
+    z-index: 1;
+    box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.75);
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.fear-greed-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.1rem;
+    z-index: 1;
+    min-width: 0;
+}
+
+.fear-greed-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+    color: var(--ff-muted);
+    white-space: nowrap;
+}
+
+.fear-greed-val {
+    font-size: clamp(1.5rem, 3vw, 1.75rem);
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.05;
+}
+
+.fear-greed-label {
+    font-size: 0.82rem;
+    font-weight: 800;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.fear-greed-hero.fg-extreme-fear {
+    background: linear-gradient(145deg, rgba(255, 242, 242, 0.92), rgba(255, 228, 228, 0.85));
+}
+.fear-greed-hero.fg-extreme-fear .fear-greed-val { color: #e04545; }
+.fear-greed-hero.fg-extreme-fear .fear-greed-label { color: #c83838; }
+.fear-greed-hero.fg-extreme-fear .fear-greed-glow {
+    background: radial-gradient(circle, rgba(255, 120, 120, 0.28), transparent 68%);
+}
+.fear-greed-hero.fg-extreme-fear .fear-greed-icon { background: rgba(255, 230, 230, 0.9); color: #d04040; }
+
+.fear-greed-hero.fg-fear {
+    background: linear-gradient(145deg, rgba(255, 248, 238, 0.92), rgba(255, 236, 218, 0.86));
+}
+.fear-greed-hero.fg-fear .fear-greed-val { color: #e07830; }
+.fear-greed-hero.fg-fear .fear-greed-label { color: #c86828; }
+.fear-greed-hero.fg-fear .fear-greed-glow {
+    background: radial-gradient(circle, rgba(255, 170, 90, 0.22), transparent 68%);
+}
+.fear-greed-hero.fg-fear .fear-greed-icon { background: rgba(255, 240, 225, 0.9); color: #d07030; }
+
+.fear-greed-hero.fg-neutral {
+    background: linear-gradient(145deg, rgba(248, 250, 252, 0.92), rgba(235, 240, 248, 0.86));
+}
+.fear-greed-hero.fg-neutral .fear-greed-val { color: #7a8a9a; }
+.fear-greed-hero.fg-neutral .fear-greed-label { color: #6a7a8a; }
+.fear-greed-hero.fg-neutral .fear-greed-glow {
+    background: radial-gradient(circle, rgba(180, 195, 215, 0.2), transparent 68%);
+}
+.fear-greed-hero.fg-neutral .fear-greed-icon { background: rgba(245, 248, 252, 0.92); color: #8a9aaa; }
+
+.fear-greed-hero.fg-greed {
+    background: linear-gradient(145deg, rgba(240, 252, 245, 0.92), rgba(225, 248, 235, 0.86));
+}
+.fear-greed-hero.fg-greed .fear-greed-val { color: #38a868; }
+.fear-greed-hero.fg-greed .fear-greed-label { color: #2d9058; }
+.fear-greed-hero.fg-greed .fear-greed-glow {
+    background: radial-gradient(circle, rgba(100, 210, 150, 0.22), transparent 68%);
+}
+.fear-greed-hero.fg-greed .fear-greed-icon { background: rgba(230, 250, 240, 0.9); color: #38a060; }
+
+.fear-greed-hero.fg-extreme-greed {
+    background: linear-gradient(145deg, rgba(232, 252, 250, 0.92), rgba(210, 248, 245, 0.86));
+}
+.fear-greed-hero.fg-extreme-greed .fear-greed-val { color: #18a8a0; }
+.fear-greed-hero.fg-extreme-greed .fear-greed-label { color: #148f88; }
+.fear-greed-hero.fg-extreme-greed .fear-greed-glow {
+    background: radial-gradient(circle, rgba(80, 220, 210, 0.28), transparent 68%);
+}
+.fear-greed-hero.fg-extreme-greed .fear-greed-icon { background: rgba(220, 250, 248, 0.92); color: #18a898; }
+
+.fear-greed-hero.fg-unknown .fear-greed-val { color: #9aa8b8; }
+.fear-greed-hero.fg-unknown .fear-greed-label { color: var(--ff-muted); }
 
 .price-hero-meta {
     grid-column: 1 / -1;
@@ -1531,6 +1661,7 @@ code {
     .news-table-fluid th,
     .news-table-fluid td { padding: 12px 10px; }
     .price-hero-strip { grid-template-columns: 1fr; }
+    .fear-greed-hero { min-height: 96px; }
     .weight-score-strip { grid-template-columns: repeat(2, 1fr); }
     .orbit-grid { grid-template-columns: 1fr; }
     .panel-a, .panel-full { grid-column: span 1; }

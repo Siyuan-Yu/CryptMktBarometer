@@ -623,8 +623,51 @@
         }
     }
 
+    const FG_ZONE_CLASS = [
+        "fg-extreme-fear",
+        "fg-fear",
+        "fg-neutral",
+        "fg-greed",
+        "fg-extreme-greed",
+        "fg-unknown",
+    ];
+
+    const FG_ICON = {
+        "fg-extreme-fear": "😱",
+        "fg-fear": "😰",
+        "fg-neutral": "😐",
+        "fg-greed": "😊",
+        "fg-extreme-greed": "🤑",
+        "fg-unknown": "◎",
+    };
+
+    function renderFearGreed(fg) {
+        const widget = $("fear-greed-widget");
+        const valEl = $("fg-value");
+        const labelEl = $("fg-label");
+        const iconEl = $("fg-icon");
+        if (!widget) return;
+
+        FG_ZONE_CLASS.forEach((c) => widget.classList.remove(c));
+
+        if (!fg || fg.value == null) {
+            widget.classList.add("fg-unknown");
+            if (valEl) valEl.textContent = "—";
+            if (labelEl) labelEl.textContent = fg && fg.error ? "暂不可用" : "—";
+            if (iconEl) iconEl.textContent = FG_ICON["fg-unknown"];
+            return;
+        }
+
+        const zone = fg.zone || "fg-unknown";
+        widget.classList.add(zone);
+        if (valEl) valEl.textContent = String(Math.round(Number(fg.value)));
+        if (labelEl) labelEl.textContent = fg.label || "—";
+        if (iconEl) iconEl.textContent = FG_ICON[zone] || FG_ICON["fg-unknown"];
+    }
+
     function renderPrices(data) {
         const tickers = (data && data.tickers) || {};
+        renderFearGreed(data && data.fear_greed);
         ["BTC", "ETH", "SOL"].forEach((sym) => {
             const card = $(`price-${sym.toLowerCase()}`);
             if (!card) return;
