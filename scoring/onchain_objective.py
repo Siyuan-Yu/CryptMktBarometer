@@ -133,7 +133,8 @@ def compute_adjustments(
     prev: OnchainSnapshot | None = None,
 ) -> OnchainSnapshot:
     """根据快照计算各品种客观加减分，写回 snap.adj_*。"""
-    fng = fear_greed_adjustment(snap.fear_greed)
+    # 大盘恐慌改在最终分 apply_fear_adjustments 离散加减，链上层不再叠加 F&G
+    fng = 0.0
     market = market_global_adjustment(snap.market_cap_chg_24h_pct)
     etf = etf_flow_proxy_adjustment(snap.market_cap_chg_24h_pct)
     btc_m = btc_miner_adjustment(snap.btc_hashrate_chg_pct)
@@ -150,7 +151,7 @@ def compute_adjustments(
     snap.adj_sol = round(clamp(fng + market + etf + sol_f, -12.0, 12.0), 2)
 
     parts = [
-        f"恐惧贪婪{snap.fear_greed}({snap.fear_greed_class})→全市场{fng:+.1f}",
+        f"恐惧贪婪{snap.fear_greed}({snap.fear_greed_class})→计分层离散处理",
         f"BTC矿工哈希率{snap.btc_hashrate_chg_pct or 0:+.2f}%→{btc_m:+.1f}",
         f"ETH链上量/大单→{eth_f:+.1f}",
         f"SOL TVL{snap.sol_tvl_chg_pct or 0:+.2f}%→{sol_f:+.1f}",

@@ -78,7 +78,10 @@ api_keys:
   fred: ""                   # FRED 宏观数据 https://fred.stlouisfed.org/docs/api/api_key.html
   cryptopanic: ""            # CryptoPanic 资讯
   coinglass: ""              # CoinGlass 资金数据
-  dune: ""                   # Dune Analytics
+  dune: ""
+  cfgi: ""                      # https://cfgi.io/developer 单币种恐慌（主源）
+  gate: ""                      # 预留 Gate ETH 恐慌
+  okx: ""                       # 预留 OKX SOL 恐慌                   # Dune Analytics
 
 # 数据源开关（第三步对接时启用）
 data_sources:
@@ -135,6 +138,29 @@ scoring:
     reddit: true
     twitter: true
     binance_square: true
+  coin_fear:
+    primary: cfgi
+    multi_source_check: true
+    max_deviation: 12
+  cfgi:
+    enabled: true
+    base_url: "https://cfgi.io/api"
+    period: "1d"
+    use_proxy_fallback: true
+    tokens:
+      BTC: bitcoin
+      ETH: ethereum
+      SOL: solana
+  gate_fear:
+    enabled: false
+    base_url: ""
+    latest_path: ""
+    history_path: ""
+  okx_fear:
+    enabled: false
+    base_url: ""
+    latest_path: ""
+    history_path: ""
   onchain:
     fear_greed: true
     glassnode_signals: true

@@ -164,6 +164,9 @@ def api_prices():
         cache_seconds=fg_cache,
         timeout=timeout,
     )
+    from storage.coin_fear_db import get_all_latest
+
+    data["coin_fear"] = get_all_latest()
     return jsonify(data)
 
 

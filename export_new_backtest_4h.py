@@ -29,6 +29,8 @@ if str(ROOT) not in sys.path:
 from core.config_loader import PROJECT_ROOT
 from scoring.multi_asset import signal_from_score
 from scoring.symbol_scores import compute_normalized_scores_chronological
+from collectors.coin_fear_collect import backfill_daily_range
+from collectors.market_fear_collect import backfill_range as backfill_market_fear
 from storage import price_db
 from storage.symbol_score_db import clear_scores_since
 
@@ -97,6 +99,13 @@ def full_rebuild_and_export(
     )
     start_dt = datetime.strptime(start_date, "%Y-%m-%d")
     slots = iter_4h_slots(start_dt, end_dt)
+
+    end_day = end_dt.strftime("%Y-%m-%d")
+    mn = backfill_market_fear(start_date=start_date, end_date=end_day)
+    logger.info("大盘恐慌回填 alternative.me: %d 天", mn)
+    for sym in SYMBOLS:
+        n = backfill_daily_range(sym, start_date=start_date, end_date=end_day)
+        logger.info("币种情绪回填 %s: %d 天", sym, n)
 
     deleted = clear_scores_since(start_date)
     logger.info("已清空 symbol_raw_scores（%s 起）%d 条，开始全量重算…", start_date, deleted)

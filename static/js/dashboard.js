@@ -328,6 +328,7 @@
         renderNewsTable("asset-news-tbody", view.news);
         renderNewsTicker((window.__dashboardRaw || {}).top_news);
         if (scoreChart) scoreChart.setAsset(assetId);
+        updateCoinFearVisibility(assetId);
     }
 
     function bindAssetSwitcher() {
@@ -641,6 +642,32 @@
         "fg-unknown": "◎",
     };
 
+    function renderCoinFear(coinFear) {
+        const map = coinFear || {};
+        document.querySelectorAll("[data-coin-fear]").forEach((chip) => {
+            const sym = chip.getAttribute("data-coin-fear");
+            const row = map[sym] || {};
+            const zone = row.zone || "fg-unknown";
+            FG_ZONE_CLASS.forEach((c) => chip.classList.remove(c));
+            chip.classList.add(zone);
+            if (row.value == null) {
+                chip.textContent = "币种情绪 —";
+            } else {
+                chip.textContent = `币种情绪 ${Math.round(Number(row.value))}｜${row.label || "—"}`;
+            }
+        });
+        updateCoinFearVisibility(activeAsset);
+    }
+
+    function updateCoinFearVisibility(assetId) {
+        const show = assetId === "btc" || assetId === "eth" || assetId === "sol";
+        const sym = show ? ASSET_META[assetId].label : "";
+        document.querySelectorAll("[data-coin-fear]").forEach((chip) => {
+            const on = show && chip.getAttribute("data-coin-fear") === sym;
+            chip.hidden = !on;
+        });
+    }
+
     function renderFearGreed(fg) {
         const widget = $("fear-greed-widget");
         const valEl = $("fg-value");
@@ -668,6 +695,7 @@
     function renderPrices(data) {
         const tickers = (data && data.tickers) || {};
         renderFearGreed(data && data.fear_greed);
+        renderCoinFear(data && data.coin_fear);
         ["BTC", "ETH", "SOL"].forEach((sym) => {
             const card = $(`price-${sym.toLowerCase()}`);
             if (!card) return;

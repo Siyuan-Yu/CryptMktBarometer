@@ -116,6 +116,15 @@ def run_data_fetch() -> FetchResult:
         community_result = collect_community()
         errors.extend(community_result.errors)
 
+        try:
+            from collectors.coin_fear_collect import sync_today as sync_coin_fear
+            from collectors.market_fear_collect import sync_today as sync_market_fear
+
+            sync_market_fear()
+            sync_coin_fear()
+        except Exception as exc:
+            logger.warning("恐慌指数同步跳过: %s", exc)
+
         finished_at = datetime.now()
         norm_scores = compute_live_normalized_scores(
             all_news=all_news,

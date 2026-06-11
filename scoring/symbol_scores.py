@@ -146,6 +146,9 @@ def compute_normalized_symbol_scores_at(
             )
         else:
             norm = percentile_rank_score(sym, raw, exclude_current_time=ts)
+        from scoring.coin_fear import apply_fear_adjustments_to_score
+
+        norm, _ = apply_fear_adjustments_to_score(sym, norm, at)
         out[sym] = norm
     return out
 
@@ -194,6 +197,9 @@ def compute_normalized_scores_chronological(
             )
             hist = raw_hist[sym]
             norm = percentile_from_list(hist, raw)
+            from scoring.coin_fear import apply_fear_adjustments_to_score
+
+            norm, _ = apply_fear_adjustments_to_score(sym, norm, at)
             sym_scores[sym] = norm
             hist.append(raw)
             # 仅保留近 90 天窗口（按 4h 槽位数）
